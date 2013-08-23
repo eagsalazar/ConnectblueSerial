@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<plugin
+  xmlns="http://www.phonegap.com/ns/plugins/1.0"
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  id="net.esalazar.cordova.ConnectblueSerial"
+  version="0.0.0"
+  >
+
+  <name>Bluetooth Serial</name>
+  <description>Bluetooth Serial Communication Plugin for ConnectBlue BTLE modules</description>
+  <license>Apache 2.0</license>
+
+  <engines>
+    <engine name="cordova" version=">=2.8.0" />
+  </engines>
+
+  <js-module src="www/connectblueSerial.js" name="connectblueSerial">
+    <clobbers target="connectblueSerial" />
+  </js-module>
+
+  <platform name="ios">
+    <config-file target="config.xml" parent="plugins">
+      <feature name="ConnectblueSerial">
+        <param name="ios-package" value="ConnectblueSerial" />
+      </feature>
+    </config-file>
+
+    <header-file src="src/ios/BLEDefinitions.h" target-dir="ConnectblueSerial" />
+    <source-file src="src/ios/BLEDefinitions.m" target-dir="ConnectblueSerial" />
+    <header-file src="src/ios/DiscoveredPeripheral.h" target-dir="ConnectblueSerial" />
+    <header-file src="src/ios/DiscoveredPeripheral.m" target-dir="ConnectblueSerial" />
+    <header-file src="src/ios/ScanController.h" target-dir="ConnectblueSerial" />
+    <header-file src="src/ios/ScanController.m" target-dir="ConnectblueSerial" />
+    <header-file src="src/ios/SerialPort.h" target-dir="ConnectblueSerial" />
+    <header-file src="src/ios/SerialPort.m" target-dir="ConnectblueSerial" />
+    <header-file src="src/ios/SerialPortController.h" target-dir="ConnectblueSerial" />
+    <header-file src="src/ios/SerialPortController.m" target-dir="ConnectblueSerial" />
+
+    <framework src="Foundation.framework" />
+    <framework src="CoreBluetooth.framework" />
+  </platform>
+</plugin>
