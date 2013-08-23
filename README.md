@@ -11,17 +11,12 @@ device and you have to be ready to consume it in your app.
 
 ## Methods
 
+- connectblueSerial.list
 - connectblueSerial.connect
 - connectblueSerial.disconnect
 - connectblueSerial.write
-- connectblueSerial.available
-- connectblueSerial.read
-- connectblueSerial.readUntil
 - connectblueSerial.subscribe
 - connectblueSerial.unsubscribe
-- connectblueSerial.clear
-- connectblueSerial.list
-- connectblueSerial.isEnabled
 - connectblueSerial.isConnected
 
 
