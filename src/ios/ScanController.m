@@ -3,7 +3,6 @@
 //
 
 #import "ScanController.h"
-#import "ServiceTableViewController.h"
 #import <CoreBluetooth/CBCentralManager.h>
 #import <CoreBluetooth/CBPeripheral.h>
 #import "DiscoveredPeripheral.h"
@@ -28,15 +27,6 @@ typedef enum
     NSMutableArray      *discoveredPeripherals;
 }
 
-- (id)initWithStyle:(UITableViewStyle)style
-{
-    self = [super initWithStyle:style];
-    if (self) {
-        // Custom initialization
-    }
-    return self;
-}
-
 - (void) initWithPeripherals: (NSMutableArray*) dp
 {
     discoveredPeripherals = dp;
@@ -44,32 +34,29 @@ typedef enum
     state = SCAN_S_NOT_LOADED;
 }
 
-- (void)didReceiveMemoryWarning
-{
-    // Releases the view if it doesn't have a superview.
-    [super didReceiveMemoryWarning];
-
-    // Release any cached data, images, etc that aren't in use.
-}
-
 #pragma mark - View lifecycle
 
-- (void)viewDidLoad
+- (id) init
 {
-    [super viewDidLoad];
+    if ( self = [super init] ) {
+        cbCentralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil];
 
-    cbCentralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil];
+        //[cbCentralManager retrieveConnectedPeripherals];
 
-    //[cbCentralManager retrieveConnectedPeripherals];
-
-    state = SCAN_S_DISAPPEARED;
+        state = SCAN_S_DISAPPEARED;
+        
+        [self clearPeriph];
+        
+        state = SCAN_S_APPEARED_IDLE;
+    }
+    
+    return self;
 }
 
-- (void)viewDidUnload
+- (void)dealloc
 {
-    //[self setScanButton:nil];
-    [super viewDidUnload];
-
+    [self scan: FALSE];
+    
     cbCentralManager = nil;
 
     // Release any retained subviews of the main view.
@@ -77,261 +64,6 @@ typedef enum
 
     state = SCAN_S_NOT_LOADED;
 
-}
-
-- (void)viewWillAppear:(BOOL)animated
-{
-    [super viewWillAppear:animated];
-}
-
-- (void)viewDidAppear:(BOOL)animated
-{
-    [super viewDidAppear:animated];
-
-    [self clearPeriph];
-
-    state = SCAN_S_APPEARED_IDLE;
-
-    [self.tableView reloadData];
-}
-
-- (void)viewWillDisappear:(BOOL)animated
-{
-    [self scan: FALSE];
-
-    [super viewWillDisappear:animated];
-
-    state = SCAN_S_WILL_DISAPPEAR;
-}
-
-- (void)viewDidDisappear:(BOOL)animated
-{
-    [super viewDidDisappear:animated];
-
-    state = SCAN_S_DISAPPEARED;
-}
-
--(void) enterForeground
-{
-    [self clearPeriph];
-
-    state = SCAN_S_APPEARED_IDLE;
-}
-
--(void) enterBackground
-{
-    [self scan: FALSE];
-
-    state = SCAN_S_DISAPPEARED;
-}
-
-- (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
-{
-    // Return YES for supported orientations
-    //return (interfaceOrientation == UIInterfaceOrientationPortrait);
-
-    bool result = YES;
-
-    if(interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown)
-    {
-        result = NO;
-    }
-
-    return result;
-}
-
-#pragma mark - Table view data source
-
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
-{
-    // Return the number of sections.
-
-    return 2;
-}
-
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
-{
-    // Return the number of rows in the section.
-    NSInteger nRows;
-
-    switch(section)
-    {
-        case 0:
-            nRows = 1;
-            break;
-
-        case 1:
-            nRows = discoveredPeripherals.count;
-            break;
-
-        default:
-            nRows = 0;
-            break;
-    }
-
-    return nRows;
-}
-
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    static NSString *CellIdentifier = @"ScanCell";
-
-    ScanCell *cell = [tableView dequeueReusableCellWithIdentifier:CellIdentifier];
-
-    DiscoveredPeripheral* discoveredPeripheral;
-
-    cell.activityView.hidesWhenStopped = TRUE;
-    cell.accessoryType = UITableViewCellAccessoryNone;
-
-    switch(indexPath.section)
-    {
-        case 0:
-            cell.labelInfo.text = @"";
-            if(state == SCAN_S_APPEARED_SCANNING)
-            {
-                cell.labelName.text = @"Stop Scan";
-                //cell.labelInfo.text = @"Active";
-
-                [cell.activityView startAnimating];
-            }
-            else
-            {
-                cell.labelName.text = @"Start Scan";
-                //cell.labelInfo.text = @"Inactive";
-
-                [cell.activityView stopAnimating];
-            }
-            break;
-
-        case 1:
-            discoveredPeripheral = [discoveredPeripherals objectAtIndex:indexPath.row];
-
-            cell.labelName.text = discoveredPeripheral.peripheral.name;
-
-            switch(discoveredPeripheral.state)
-            {
-            case DP_STATE_CONNECTING:
-                cell.labelInfo.text = [[NSString alloc] initWithFormat:@"Connecting"];
-
-                [cell.activityView startAnimating];
-                cell.accessoryType = UITableViewCellAccessoryNone;
-                break;
-
-            case DP_STATE_CONNECTED:
-                cell.labelInfo.text = [[NSString alloc] initWithFormat:@"Connected"];
-
-                [cell.activityView stopAnimating];
-                cell.accessoryType = UITableViewCellAccessoryCheckmark;
-                break;
-
-            default:
-                cell.labelInfo.text = [[NSString alloc] initWithFormat:@"RSSI: %@", discoveredPeripheral.rssi];
-
-                [cell.activityView stopAnimating];
-                cell.accessoryType = UITableViewCellAccessoryNone;
-                break;
-            }
-            break;
-    }
-
-    return cell;
-}
-
-- (NSString*) tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
-{
-    NSString *str;
-
-    switch(section)
-    {
-        case 0:
-            str = @"Bluetooth Low Energy Scanning";
-            break;
-
-        case 1:
-            str = @"Found Devices";
-            break;
-
-        default:
-            break;
-    }
-
-    return str;
-}
-
-#pragma mark - Table view delegate
-
-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
-{
-
-    if(cbCentralManager.state == CBCentralManagerStatePoweredOn)
-    {
-        ScanCell* cell = (ScanCell*)[tableView cellForRowAtIndexPath:indexPath];
-
-        if(indexPath.section == 0)
-        {
-            if(state == SCAN_S_APPEARED_SCANNING)
-            {
-                [self scan: FALSE];
-
-                cell.labelName.text = @"Start Scan";
-                //cell.labelInfo.text = @"Inactive";
-                [cell.activityView stopAnimating];
-
-                state = SCAN_S_APPEARED_IDLE;
-            }
-            else if((state == SCAN_S_APPEARED_IDLE) &&
-                    (cbCentralManager.state == CBCentralManagerStatePoweredOn))
-            {
-
-                [self scan: TRUE];
-
-                cell.labelName.text = @"Stop Scan";
-                //cell.labelInfo.text = @"Active";
-                [cell.activityView startAnimating];
-
-                state = SCAN_S_APPEARED_SCANNING;
-            }
-        }
-        else
-        {
-            DiscoveredPeripheral* dp = [discoveredPeripherals objectAtIndex:indexPath.row];
-
-            NSDictionary *dictionary;
-
-            switch (dp.state)
-            {
-                case DP_STATE_IDLE:
-
-                    cell.labelInfo.text = @"Connecting";
-
-                    [cell.activityView startAnimating];
-
-                    dictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:1] forKey:CBConnectPeripheralOptionNotifyOnDisconnectionKey];
-
-                    [cbCentralManager connectPeripheral:dp.peripheral options:dictionary];
-
-                    dp.state = DP_STATE_CONNECTING;
-                    break;
-
-                case DP_STATE_CONNECTED:
-                case DP_STATE_CONNECTING:
-                    [cbCentralManager cancelPeripheralConnection:dp.peripheral];
-
-                    cell.labelInfo.text = @"";
-
-                    [cell.activityView stopAnimating];
-                    cell.accessoryType = UITableViewCellAccessoryNone;
-
-                    dp.state = DP_STATE_IDLE;
-                    break;
-
-                default:
-                    break;
-            }
-        }
-
-        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    }
 }
 
 - (void) scan: (bool) enable
@@ -383,16 +115,6 @@ typedef enum
     if(dp.state == DP_STATE_IDLE)
     {
         [discoveredPeripherals removeObjectAtIndex:row];
-
-        NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:1];
-
-        ScanCell* cell = (ScanCell*)[self.tableView cellForRowAtIndexPath:indexPath];
-
-        [cell.activityView stopAnimating];
-
-        cell.accessoryType = UITableViewCellAccessoryNone;
-
-        [self.tableView deleteRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationFade];
     }
 }
 
@@ -405,8 +127,6 @@ typedef enum
             [self clearPeriphForRow:i];
         }
     }
-
-    [self.tableView reloadData];
 }
 
 - (IBAction)clearPeripherals:(id)sender {
@@ -442,15 +162,6 @@ typedef enum
 
     if(row != -1)
     {
-        NSIndexPath* indexPath = [NSIndexPath indexPathForRow:row inSection:1];
-
-        ScanCell* cell = (ScanCell*)[self.tableView cellForRowAtIndexPath:indexPath];
-
-        cell.labelInfo.text = [[NSString alloc] initWithFormat:@"Connected"];
-
-        [cell.activityView stopAnimating];
-        cell.accessoryType = UITableViewCellAccessoryCheckmark;
-
         DiscoveredPeripheral* dp = [discoveredPeripherals objectAtIndex:row];
 
         dp.state = DP_STATE_CONNECTED;
@@ -465,15 +176,6 @@ typedef enum
 
     if(row != -1)
     {
-        NSIndexPath* indexPath = [NSIndexPath indexPathForRow:row inSection:1];
-
-        ScanCell* cell = (ScanCell*)[self.tableView cellForRowAtIndexPath:indexPath];
-
-        cell.labelInfo.text = [[NSString alloc] initWithFormat:@""];
-
-        cell.accessoryType = UITableViewCellAccessoryNone;
-        [cell.activityView stopAnimating];
-
         DiscoveredPeripheral* dp = [discoveredPeripherals objectAtIndex:row];
 
         dp.state = DP_STATE_IDLE;
@@ -517,25 +219,12 @@ typedef enum
             [discoveredPeripherals addObject:discPeripheral];
 
             //NSLog(@"%i: Add %@", ([discoveredPeripherals count] - 1), discPeripheral.peripheral.name);
-
-            NSIndexPath *indexPath = [NSIndexPath indexPathForRow:[discoveredPeripherals count] - 1 inSection:1];
-
-            [self.tableView insertRowsAtIndexPaths: [NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
         }
         else
         {
             discPeripheral.peripheral = peripheral;
             discPeripheral.advertisment = advertisementData;
             discPeripheral.rssi = RSSI;
-
-            NSIndexPath* indexPath = [NSIndexPath indexPathForRow:row inSection:1];
-
-            ScanCell* cell = (ScanCell*)[self.tableView cellForRowAtIndexPath:indexPath];
-
-            //NSLog(@"%i: Update %@", row, discPeripheral.peripheral.name);
-
-            cell.labelName.text = discPeripheral.peripheral.name;
-            cell.labelInfo.text = [[NSString alloc] initWithFormat:@"RSSI: %@", discPeripheral.rssi];
         }
     }
 }
@@ -547,15 +236,6 @@ typedef enum
 
     if(row != -1)
     {
-        NSIndexPath* indexPath = [NSIndexPath indexPathForRow:row inSection:1];
-
-        ScanCell* cell = (ScanCell*)[self.tableView cellForRowAtIndexPath:indexPath];
-
-        cell.labelInfo.text = [[NSString alloc] initWithFormat:@""];
-
-        cell.accessoryType = UITableViewCellAccessoryNone;
-        [cell.activityView stopAnimating];
-
         DiscoveredPeripheral* dp = [discoveredPeripherals objectAtIndex:row];
 
         dp.state = DP_STATE_IDLE;

@@ -4,7 +4,7 @@
 #import <UIKit/UIKit.h>
 #import <CoreBluetooth/CBCentralManager.h>
 
-@interface ScanController : <CBCentralManagerDelegate>
+@interface ScanController : NSObject <CBCentralManagerDelegate>
 
 - (IBAction)clearPeripherals:(id)sender;
 
