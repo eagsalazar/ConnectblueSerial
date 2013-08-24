@@ -26,7 +26,7 @@
 
 - (void)list:(CDVInvokedUrlCommand *)command;
 - (void)isConnected:(CDVInvokedUrlCommand *)command;
-- (void)isAvailable:(CDVInvokedUrlCommand *)command;
+- (void)available:(CDVInvokedUrlCommand *)command;
 
 @end
 

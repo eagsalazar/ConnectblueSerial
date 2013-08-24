@@ -118,38 +118,34 @@
 }
 
 - (void)list:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{
-        NSString* payload = nil;
-        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:payload];
-        
-        [pluginResult setKeepCallbackAsBool:TRUE];
-        
-        [self scanForBLEPeripherals:3];
-        
-        [NSTimer scheduledTimerWithTimeInterval:(float)3.0
-                                         target:self
-                                       selector:@selector(listPeripheralsTimer:)
-                                       userInfo:[command.callbackId copy]
-                                        repeats:NO];
-        
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];        
-    }];    
+    NSString* payload = nil;
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:payload];
+    
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    
+    [self scanForBLEPeripherals:3];
+    
+    [NSTimer scheduledTimerWithTimeInterval:(float)3.0
+                                     target:self
+                                   selector:@selector(listPeripheralsTimer:)
+                                   userInfo:[command.callbackId copy]
+                                    repeats:NO];
+    
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];        
 }
 
 - (void)isEnabled:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{            
-        // short delay so CBCentralManger can spin up bluetooth
-        [NSTimer scheduledTimerWithTimeInterval:(float)0.2
-                                         target:self
-                                       selector:@selector(bluetoothStateTimer:)
-                                       userInfo:[command.callbackId copy]
-                                        repeats:NO];
-        
-        CDVPluginResult *pluginResult = nil;
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
-        [pluginResult setKeepCallbackAsBool:TRUE];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
+    // short delay so CBCentralManger can spin up bluetooth
+    [NSTimer scheduledTimerWithTimeInterval:(float)0.2
+                                     target:self
+                                   selector:@selector(bluetoothStateTimer:)
+                                   userInfo:[command.callbackId copy]
+                                    repeats:NO];
+    
+    CDVPluginResult *pluginResult = nil;
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void)isConnected:(CDVInvokedUrlCommand*)command {
