@@ -20,9 +20,13 @@
 
 - (void)subscribe:(CDVInvokedUrlCommand *)command;
 - (void)write:(CDVInvokedUrlCommand *)command;
+- (void)read:(CDVInvokedUrlCommand *)command;
+- (void)readUntil:(CDVInvokedUrlCommand *)command;
+- (void)clear:(CDVInvokedUrlCommand *)command;
 
 - (void)list:(CDVInvokedUrlCommand *)command;
 - (void)isConnected:(CDVInvokedUrlCommand *)command;
+- (void)isAvailable:(CDVInvokedUrlCommand *)command;
 
 @end
 

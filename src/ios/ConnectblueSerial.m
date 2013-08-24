@@ -18,8 +18,7 @@
 
 @implementation ConnectblueSerial
 
-- (void)pluginInitialize {
-
+- (void)pluginInitialize {    
     NSLog(@"Bluetooth Serial Cordova Plugin - BLE version");
     NSLog(@"(c)2013 Don Coleman");
 
@@ -35,166 +34,182 @@
 #pragma mark - Cordova Plugin Methods
 
 - (void)connect:(CDVInvokedUrlCommand *)command {
-    
-    NSLog(@"connect");
-    CDVPluginResult *pluginResult = nil;
-    NSString *uuid = [command.arguments objectAtIndex:0];
-    
-    // if the uuid is null or blank, scan and
-    // connect to the first available device
+    [self.commandDelegate runInBackground:^{
+        NSLog(@"connect");
+        CDVPluginResult *pluginResult = nil;
+        NSString *uuid = [command.arguments objectAtIndex:0];
+        
+        // if the uuid is null or blank, scan and
+        // connect to the first available device
 
-    if (uuid == (NSString*)[NSNull null]) {
-        [self connectToFirstDevice];
-    } else if ([uuid isEqualToString:@""]) {
-        [self connectToFirstDevice];
-    } else {
-        [self connectToUUID:uuid];
-    }
-    
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
-    [pluginResult setKeepCallbackAsBool:TRUE];
-    _connectCallbackId = [command.callbackId copy];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        if (uuid == (NSString*)[NSNull null]) {
+            [self connectToFirstDevice];
+        } else if ([uuid isEqualToString:@""]) {
+            [self connectToFirstDevice];
+        } else {
+            [self connectToUUID:uuid];
+        }
+        
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+        [pluginResult setKeepCallbackAsBool:TRUE];
+        _connectCallbackId = [command.callbackId copy];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 - (void)disconnect:(CDVInvokedUrlCommand*)command {
-    
-    NSLog(@"disconnect");
-    
-    CDVPluginResult *pluginResult = nil;
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate runInBackground:^{
+        NSLog(@"disconnect");
+        
+        CDVPluginResult *pluginResult = nil;
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
 
-    if (_bleShield.activePeripheral) {
-        if(_bleShield.activePeripheral.isConnected)
-        {
-            [[_bleShield CM] cancelPeripheralConnection:[_bleShield activePeripheral]];
-            return;
+        if (_bleShield.activePeripheral) {
+            if(_bleShield.activePeripheral.isConnected)
+            {
+                [[_bleShield CM] cancelPeripheralConnection:[_bleShield activePeripheral]];
+                return;
+            }
         }
-    }
-    
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    _connectCallbackId = nil;
+        
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        _connectCallbackId = nil;
+    }];
 }
 
 - (void)subscribe:(CDVInvokedUrlCommand*)command {
-    NSLog(@"subscribe");
-    
-    CDVPluginResult *pluginResult = nil;
-    NSString *delimiter = [command.arguments objectAtIndex:0];
-    
-    if (delimiter != nil) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
-        [pluginResult setKeepCallbackAsBool:TRUE];
-        _subscribeCallbackId = [command.callbackId copy];
-        _delimiter = [delimiter copy];
-    } else {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"delimiter was null"];
-    }
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    [self.commandDelegate runInBackground:^{
+        NSLog(@"subscribe");
+        
+        CDVPluginResult *pluginResult = nil;
+        NSString *delimiter = [command.arguments objectAtIndex:0];
+        
+        if (delimiter != nil) {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+            [pluginResult setKeepCallbackAsBool:TRUE];
+            _subscribeCallbackId = [command.callbackId copy];
+            _delimiter = [delimiter copy];
+        } else {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"delimiter was null"];
+        }
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 - (void)write:(CDVInvokedUrlCommand*)command {
-    NSLog(@"write");
-    
-    CDVPluginResult *pluginResult = nil;
-    NSString *message = [command.arguments objectAtIndex:0];
+    [self.commandDelegate runInBackground:^{
+        NSLog(@"write");
+        
+        CDVPluginResult *pluginResult = nil;
+        NSString *message = [command.arguments objectAtIndex:0];
 
-    if (message != nil) {
-        
-        NSData *d = [message dataUsingEncoding:NSUTF8StringEncoding];
-        
-        [_bleShield write:d];
-        
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    } else {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"message was null"];
-    }
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        if (message != nil) {
+            
+            NSData *d = [message dataUsingEncoding:NSUTF8StringEncoding];
+            
+            [_bleShield write:d];
+            
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        } else {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"message was null"];
+        }
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 - (void)list:(CDVInvokedUrlCommand*)command {
-    
-    CDVPluginResult *pluginResult = nil;
-
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
-    [pluginResult setKeepCallbackAsBool:TRUE];
-
-    [self scanForBLEPeripherals:3];
-    
-    [NSTimer scheduledTimerWithTimeInterval:(float)3.0
-                                     target:self
-                                   selector:@selector(listPeripheralsTimer:)
-                                   userInfo:[command.callbackId copy]
-                                    repeats:NO];
-
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    [self.commandDelegate runInBackground:^{
+        NSString* payload = nil;
+        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:payload];
+        
+        [pluginResult setKeepCallbackAsBool:TRUE];
+        
+        [self scanForBLEPeripherals:3];
+        
+        [NSTimer scheduledTimerWithTimeInterval:(float)3.0
+                                         target:self
+                                       selector:@selector(listPeripheralsTimer:)
+                                       userInfo:[command.callbackId copy]
+                                        repeats:NO];
+        
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];        
+    }];    
 }
 
 - (void)isEnabled:(CDVInvokedUrlCommand*)command {
-    
-    // short delay so CBCentralManger can spin up bluetooth
-    [NSTimer scheduledTimerWithTimeInterval:(float)0.2
-                                     target:self
-                                   selector:@selector(bluetoothStateTimer:)
-                                   userInfo:[command.callbackId copy]
-                                    repeats:NO];
-    
-    CDVPluginResult *pluginResult = nil;
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
-    [pluginResult setKeepCallbackAsBool:TRUE];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    [self.commandDelegate runInBackground:^{            
+        // short delay so CBCentralManger can spin up bluetooth
+        [NSTimer scheduledTimerWithTimeInterval:(float)0.2
+                                         target:self
+                                       selector:@selector(bluetoothStateTimer:)
+                                       userInfo:[command.callbackId copy]
+                                        repeats:NO];
+        
+        CDVPluginResult *pluginResult = nil;
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+        [pluginResult setKeepCallbackAsBool:TRUE];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 - (void)isConnected:(CDVInvokedUrlCommand*)command {
-    
-    CDVPluginResult *pluginResult = nil;
-    
-    if (_bleShield.isConnected) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    } else {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Not connected"];
-    }
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    [self.commandDelegate runInBackground:^{
+        CDVPluginResult *pluginResult = nil;
+        
+        if (_bleShield.isConnected) {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        } else {
+            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Not connected"];
+        }
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 - (void)available:(CDVInvokedUrlCommand*)command {
-    CDVPluginResult *pluginResult = nil;
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsInt:[_buffer length]];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    [self.commandDelegate runInBackground:^{
+        CDVPluginResult *pluginResult = nil;
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsInt:[_buffer length]];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 - (void)read:(CDVInvokedUrlCommand*)command {
-    CDVPluginResult *pluginResult = nil;
-    NSString *message = @"";
-    
-    if ([_buffer length] > 0) {
-        int end = [_buffer length] - 1;
-        message = [_buffer substringToIndex:end];
-        NSRange entireString = NSMakeRange(0, end);
-        [_buffer deleteCharactersInRange:entireString];
-    }
-    
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:message];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    [self.commandDelegate runInBackground:^{
+        CDVPluginResult *pluginResult = nil;
+        NSString *message = @"";
+        
+        if ([_buffer length] > 0) {
+            int end = [_buffer length] - 1;
+            message = [_buffer substringToIndex:end];
+            NSRange entireString = NSMakeRange(0, end);
+            [_buffer deleteCharactersInRange:entireString];
+        }
+        
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:message];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 - (void)readUntil:(CDVInvokedUrlCommand*)command {
-    
-    NSString *delimiter = [command.arguments objectAtIndex:0];
-    NSString *message = [self readUntilDelimiter:delimiter];
-    CDVPluginResult *pluginResult = nil;
+    [self.commandDelegate runInBackground:^{
+        NSString *delimiter = [command.arguments objectAtIndex:0];
+        NSString *message = [self readUntilDelimiter:delimiter];
+        CDVPluginResult *pluginResult = nil;
 
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:message];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:message];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 - (void)clear:(CDVInvokedUrlCommand*)command {
-    int end = [_buffer length] - 1;
-    NSRange truncate = NSMakeRange(0, end);
-    [_buffer deleteCharactersInRange:truncate];
+    [self.commandDelegate runInBackground:^{
+        int end = [_buffer length] - 1;
+        NSRange truncate = NSMakeRange(0, end);
+        [_buffer deleteCharactersInRange:truncate];
+    }];
 }
 
-#pragma mark - BLEDelegate 
+#pragma mark - BLEDelegate
 
 - (void)bleDidReceiveData:(unsigned char *)data length:(int)length {
     NSLog(@"bleDidReceiveData");
