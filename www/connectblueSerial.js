@@ -47,8 +47,12 @@ cordova.define('ConnectblueSerial', function (require, exports, module) {
       cordova.exec(success, failure, "ConnectblueSerial", "isConnected", []);
     },
                
-   isAvailable: function (success, failure) {
-      cordova.exec(success, failure, "ConnectblueSerial", "isAvailable", []);
+    isEnabled: function (success, failure) {
+      cordova.exec(success, failure, "ConnectblueSerial", "isEnabled", []);
+    },
+               
+   available: function (success, failure) {
+      cordova.exec(success, failure, "ConnectblueSerial", "available", []);
    }
 
   };
