@@ -5,9 +5,7 @@
 #import <UIKit/UIKit.h>
 #import "SerialPort.h"
 
-@interface SerialPortController : <SerialPortDelegate>
-
-@property (strong, nonatomic) IBOutlet UITextField *messageTextField;
+@interface SerialPortController : NSObject <SerialPortDelegate>
 
 - (void) initWithPeripherals: (NSMutableArray*) discoveredPeripherals;
 

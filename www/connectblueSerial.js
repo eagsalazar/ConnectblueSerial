@@ -1,6 +1,5 @@
-cordova.define('connectblueSerial', function (require, exports, module) {
+cordova.define('ConnectblueSerial', function (require, exports, module) {
   module.exports = {
-
     // [
     //  {uuid: 'abdadflk', name: 'IonProbe1'},
     //  {uuid: 'abdadfll', name: 'IonProbe2'},
@@ -23,6 +22,18 @@ cordova.define('connectblueSerial', function (require, exports, module) {
       cordova.exec(success, failure, "ConnectblueSerial", "write", [data]);
     },
 
+    read: function (data, success, failure) {
+      cordova.exec(success, failure, "ConnectblueSerial", "read", [data]);
+    },
+
+    readUntil: function (data, success, failure) {
+      cordova.exec(success, failure, "ConnectblueSerial", "readUntil", [data]);
+    },
+               
+    clear: function (data, success, failure) {
+      cordova.exec(success, failure, "ConnectblueSerial", "clear", [data]);
+    },
+               
     // update is called every time there is new data
     subscribe: function (update, failure) {
       cordova.exec(update, failure, "ConnectblueSerial", "subscribe", []);
@@ -34,7 +45,15 @@ cordova.define('connectblueSerial', function (require, exports, module) {
 
     isConnected: function (success, failure) {
       cordova.exec(success, failure, "ConnectblueSerial", "isConnected", []);
-    }
+    },
+               
+    isEnabled: function (success, failure) {
+      cordova.exec(success, failure, "ConnectblueSerial", "isEnabled", []);
+    },
+               
+   available: function (success, failure) {
+      cordova.exec(success, failure, "ConnectblueSerial", "available", []);
+   }
 
   };
 });

@@ -2,6 +2,9 @@
 //  Main external interface used in plugin
 //
 #import <Cordova/CDV.h>
+#import <Cordova/CDVPlugin.h>
+#import <CoreBluetooth/CBCentralManager.h>
+#import "BLE.h"
 #import "BLEDefinitions.h"
 
 @interface ConnectblueSerial : CDVPlugin <BLEDelegate> {
@@ -17,10 +20,13 @@
 
 - (void)subscribe:(CDVInvokedUrlCommand *)command;
 - (void)write:(CDVInvokedUrlCommand *)command;
+- (void)read:(CDVInvokedUrlCommand *)command;
+- (void)readUntil:(CDVInvokedUrlCommand *)command;
+- (void)clear:(CDVInvokedUrlCommand *)command;
 
 - (void)list:(CDVInvokedUrlCommand *)command;
 - (void)isConnected:(CDVInvokedUrlCommand *)command;
+- (void)available:(CDVInvokedUrlCommand *)command;
 
 @end
 
-#endif
