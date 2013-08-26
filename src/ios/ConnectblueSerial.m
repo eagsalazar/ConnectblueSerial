@@ -134,9 +134,31 @@ typedef enum {
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
+- (void) write: (CDVInvokedUrlCommand *) command {
+  CDVPluginResult *pluginResult = nil;
+
+  if (state == CONNECTED) {
+    NSString* data = [command.arguments objectAtIndex:0];
+    [serialPortController write: data];
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+  } else {
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Can't write, not CONNECTED!"];
+  }
+
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
 //
 // Private Methods
 //
+
+- (void) onData: (NSData*) data {
+  // FIXME - right encoding?
+  // FIXME - connect to callback from connect somehow...
+  NSString *str = [[NSString alloc] initWithBytes:data.bytes length:data.length encoding:NSUTF8StringEncoding];
+  NSLog(@"GOT SOME DATA: %@", data);
+  NSLog(@"GOT SOME STRING: %@", str);
+}
 
 - (void) startScan {
   if(state == IDLE) {
@@ -220,6 +242,8 @@ typedef enum {
     [self setState: CONNECTED];
     connectedPeripheral = [self findDiscoveredPeripheralByUUID:uuid];
     connectedPeripheral.state = DP_STATE_CONNECTED;
+
+    serialPortController = [[SerialPortController alloc] initWithPeripheral: connectedPeripheral andDataReceiverDelegate: self];
 
     CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [pluginResult setKeepCallbackAsBool:TRUE];

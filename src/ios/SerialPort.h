@@ -14,21 +14,16 @@
 
 typedef enum
 {
-    SP_EVT_OPEN,
-    SP_EVT_CLOSED
-    
+  SP_EVT_OPEN,
+  SP_EVT_CLOSED
 } SPEvent;
 
 @class SerialPort;
 
 @protocol SerialPortDelegate <NSObject>
-
-- (void) port: (SerialPort*) serialPort event : (SPEvent) ev error: (NSInteger)err;
-
 - (void) writeComplete: (SerialPort*) serialPort withError: (NSInteger)err;
-
+- (void) port: (SerialPort*) serialPort event : (SPEvent) ev error: (NSInteger)err;
 - (void) port: (SerialPort*) serialPort receivedData: (NSData*)data;
-
 @end
 
 @interface SerialPort : NSObject <CBPeripheralDelegate>

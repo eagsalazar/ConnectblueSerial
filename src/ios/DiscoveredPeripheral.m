@@ -28,7 +28,7 @@
 
 + (NSString*) uuidToString: (CFUUIDRef) UUID {
   CFStringRef s = CFUUIDCreateString(NULL, UUID);
-  NSString *str = [NSString stringWithCString:CFStringGetCStringPtr(s, 0)];
+  NSString *str = [NSString stringWithCString:CFStringGetCStringPtr(s, 0) encoding: [NSString defaultCStringEncoding]];
   return str;
 }
 
