@@ -1,438 +1,265 @@
 //
 //  Main external interface used in plugin
 //
-
 #import "ConnectblueSerial.h"
 #import <Cordova/CDV.h>
+#import <CoreBluetooth/CBCentralManager.h>
+#import <CoreBluetooth/CBPeripheral.h>
+#import "DiscoveredPeripheral.h"
+
+typedef enum {
+  DEALLOCATED,
+  IDLE,
+  CONNECTING,
+  DISCONNECTING,
+  CONNECTED,
+  SCANNING
+} PLUGIN_State;
 
 @interface ConnectblueSerial()
-- (NSString *)readUntilDelimiter:(NSString *)delimiter;
-- (NSMutableArray *)getPeripheralList;
-- (void)sendDataToSubscriber;
-- (CBPeripheral *)findPeripheralByUUID:(NSString *)uuid;
-- (void)connectToUUID:(NSString *)uuid;
-- (void)listPeripheralsTimer:(NSTimer *)timer;
-- (void)connectFirstDeviceTimer:(NSTimer *)timer;
-- (void)connectUuidTimer:(NSTimer *)timer;
+- (void) startScan;
+- (void) stopScan;
+- (void) setState: (PLUGIN_State) newState;
+- (NSString*) stateToString: (PLUGIN_State) testState;
+- (DiscoveredPeripheral*) findDiscoveredPeripheralByUUID: (NSString*) uuid;
 @end
 
-@implementation ConnectblueSerial
-
-- (void)pluginInitialize {    
-    NSLog(@"Bluetooth Serial Cordova Plugin - BLE version");
-    NSLog(@"(c)2013 Don Coleman");
-
-    [super pluginInitialize];
-
-    _bleShield = [[BLE alloc] init];
-    [_bleShield controlSetup:1];
-    [_bleShield setDelegate:self];
-
-    _buffer = [[NSMutableString alloc] init];
+@implementation ConnectblueSerial {
+  PLUGIN_State state;
+  CBCentralManager *cbCentralManager;
 }
 
-#pragma mark - Cordova Plugin Methods
-
-- (void)connect:(CDVInvokedUrlCommand *)command {
-    [self.commandDelegate runInBackground:^{
-        NSLog(@"connect");
-        CDVPluginResult *pluginResult = nil;
-        NSString *uuid = [command.arguments objectAtIndex:0];
-        
-        // if the uuid is null or blank, scan and
-        // connect to the first available device
-
-        if (uuid == (NSString*)[NSNull null]) {
-            [self connectToFirstDevice];
-        } else if ([uuid isEqualToString:@""]) {
-            [self connectToFirstDevice];
-        } else {
-            [self connectToUUID:uuid];
-        }
-        
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
-        [pluginResult setKeepCallbackAsBool:TRUE];
-        _connectCallbackId = [command.callbackId copy];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
+- (void) pluginInitialize {
+  [super pluginInitialize];
+  cbCentralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil];
+  [self setState: IDLE];
+  discoveredPeripherals = [[NSMutableArray alloc] init];
 }
 
-- (void)disconnect:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{
-        NSLog(@"disconnect");
-        
-        CDVPluginResult *pluginResult = nil;
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-
-        if (_bleShield.activePeripheral) {
-            if(_bleShield.activePeripheral.isConnected)
-            {
-                [[_bleShield CM] cancelPeripheralConnection:[_bleShield activePeripheral]];
-                return;
-            }
-        }
-        
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-        _connectCallbackId = nil;
-    }];
+- (void) dealloc {
+  [cbCentralManager stopScan];
+  cbCentralManager = nil;
+  [self setState: DEALLOCATED];
 }
 
-- (void)subscribe:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{
-        NSLog(@"subscribe");
-        
-        CDVPluginResult *pluginResult = nil;
-        NSString *delimiter = [command.arguments objectAtIndex:0];
-        
-        if (delimiter != nil) {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
-            [pluginResult setKeepCallbackAsBool:TRUE];
-            _subscribeCallbackId = [command.callbackId copy];
-            _delimiter = [delimiter copy];
-        } else {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"delimiter was null"];
-        }
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
-}
 
-- (void)write:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{
-        NSLog(@"write");
-        
-        CDVPluginResult *pluginResult = nil;
-        NSString *message = [command.arguments objectAtIndex:0];
+//
+// Plugin Methods
+//
 
-        if (message != nil) {
-            
-            NSData *d = [message dataUsingEncoding:NSUTF8StringEncoding];
-            
-            [_bleShield write:d];
-            
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-        } else {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"message was null"];
-        }
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
-}
+- (void) connect: (CDVInvokedUrlCommand *) command {
+  CDVPluginResult *pluginResult = nil;
 
-- (void)list:(CDVInvokedUrlCommand*)command {
-    NSString* payload = nil;
-    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:payload];
-    
-    [pluginResult setKeepCallbackAsBool:TRUE];
-    
-    [self scanForBLEPeripherals:3];
-    
-    [NSTimer scheduledTimerWithTimeInterval:(float)3.0
-                                     target:self
-                                   selector:@selector(listPeripheralsTimer:)
-                                   userInfo:[command.callbackId copy]
-                                    repeats:NO];
-    
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];        
-}
+  if (state != IDLE) {
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Already scanning!"];
+  } else {
+    [self setState: CONNECTING];
 
-- (void)isEnabled:(CDVInvokedUrlCommand*)command {
-    // short delay so CBCentralManger can spin up bluetooth
-    [NSTimer scheduledTimerWithTimeInterval:(float)0.2
-                                     target:self
-                                   selector:@selector(bluetoothStateTimer:)
-                                   userInfo:[command.callbackId copy]
-                                    repeats:NO];
-    
-    CDVPluginResult *pluginResult = nil;
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
     [pluginResult setKeepCallbackAsBool:TRUE];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    _keptCallbackId = [command.callbackId copy];
+
+    NSString* uuid = [command.arguments objectAtIndex:0];
+    DiscoveredPeripheral *discoveredPeripheral = [self findDiscoveredPeripheralByUUID: uuid];
+
+    NSDictionary *dictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:1] forKey:CBConnectPeripheralOptionNotifyOnDisconnectionKey];
+    [cbCentralManager connectPeripheral:discoveredPeripheral.peripheral options:dictionary];
+  }
+
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)isConnected:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{
-        CDVPluginResult *pluginResult = nil;
-        
-        if (_bleShield.isConnected) {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-        } else {
-            pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Not connected"];
-        }
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
-}
+- (void) disconnect: (CDVInvokedUrlCommand *) command {
+  CDVPluginResult *pluginResult = nil;
 
-- (void)available:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{
-        CDVPluginResult *pluginResult = nil;
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsInt:[_buffer length]];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
-}
+  if (state == CONNECTED || state == CONNECTING) {
 
-- (void)read:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{
-        CDVPluginResult *pluginResult = nil;
-        NSString *message = @"";
-        
-        if ([_buffer length] > 0) {
-            int end = [_buffer length] - 1;
-            message = [_buffer substringToIndex:end];
-            NSRange entireString = NSMakeRange(0, end);
-            [_buffer deleteCharactersInRange:entireString];
-        }
-        
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:message];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
-}
-
-- (void)readUntil:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{
-        NSString *delimiter = [command.arguments objectAtIndex:0];
-        NSString *message = [self readUntilDelimiter:delimiter];
-        CDVPluginResult *pluginResult = nil;
-
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:message];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
-}
-
-- (void)clear:(CDVInvokedUrlCommand*)command {
-    [self.commandDelegate runInBackground:^{
-        int end = [_buffer length] - 1;
-        NSRange truncate = NSMakeRange(0, end);
-        [_buffer deleteCharactersInRange:truncate];
-    }];
-}
-
-#pragma mark - BLEDelegate
-
-- (void)bleDidReceiveData:(unsigned char *)data length:(int)length {
-    NSLog(@"bleDidReceiveData");
-    
-    // Append to the buffer
-    NSData *d = [NSData dataWithBytes:data length:length];
-    NSString *s = [[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding];
-    NSLog(@"Received %@", s);
-    [_buffer appendString:s];
-    
-    if (_subscribeCallbackId) {
-        [self sendDataToSubscriber];
-    }
-}
-
-- (void)bleDidConnect {
-    NSLog(@"bleDidConnect");
-    CDVPluginResult *pluginResult = nil;
-        
-    if (_connectCallbackId) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-        [pluginResult setKeepCallbackAsBool:TRUE];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
-    }
-}
-
-- (void)bleDidDisconnect {
-    // TODO is there anyway to figure out why we disconnected?
-    NSLog(@"bleDidDisconnect");
-    
-    CDVPluginResult *pluginResult = nil;
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Disconnected"];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
-
-    _connectCallbackId = nil;
-}
-
-// TODO future versions should add callback for signal strength
-- (void)bleDidUpdateRSSI:(NSNumber *)rssi {
-}
-
-#pragma mark - timers
-
--(void)listPeripheralsTimer:(NSTimer *)timer {
-    NSString *callbackId = [timer userInfo];
-    NSMutableArray *peripherals = [self getPeripheralList];
-    
-    CDVPluginResult *pluginResult = nil;
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray: peripherals];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
-}
-
--(void)connectFirstDeviceTimer:(NSTimer *)timer {
-    
-    if(_bleShield.peripherals.count > 0) {
-        NSLog(@"Connecting");
-        [_bleShield connectPeripheral:[_bleShield.peripherals objectAtIndex:0]];
+    if (state == CONNECTED) {
+      [self setState: DISCONNECTING];
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+      [pluginResult setKeepCallbackAsBool:TRUE];
+      _keptCallbackId = [command.callbackId copy];
+      connectedPeripheral.state = DP_STATE_DISCONNECTING;
     } else {
-        NSString *error = @"Did not find any BLE peripherals";
-        NSLog(@"%@", error);
-        CDVPluginResult *pluginResult;
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
+      [self setState: IDLE];
+      connectedPeripheral.state = DP_STATE_IDLE;
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     }
+
+    [cbCentralManager cancelPeripheralConnection:connectedPeripheral.peripheral];
+  } else {
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Not Connected or Connecting!"];
+  }
+
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
--(void)connectUuidTimer:(NSTimer *)timer {
-    
-    NSString *uuid = [timer userInfo];
-    
-    CBPeripheral *peripheral = [self findPeripheralByUUID:uuid];
-    
-    if (peripheral) {
-        [_bleShield connectPeripheral:peripheral];
-    } else {
-        NSString *error = [NSString stringWithFormat:@"Could not find peripheral %@.", uuid];
-        NSLog(@"%@", error);
-        CDVPluginResult *pluginResult;
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:error];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
-    }
+- (void) list: (CDVInvokedUrlCommand*) command {
+    CDVPluginResult* pluginResult = nil;
+
+  if (state != IDLE) {
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Already scanning!"];
+  } else {
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    _keptCallbackId = [command.callbackId copy];
+
+    [self startScan];
+
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, 5.0 * NSEC_PER_SEC);
+    dispatch_after(popTime, dispatch_get_main_queue(), ^{
+      NSLog(@"discoveredPeripherals: %@", discoveredPeripherals);
+      DiscoveredPeripheral* discoveredPeripheral;
+
+      [self stopScan];
+
+      NSMutableArray *mappedDiscoveredPeripherals = [[NSMutableArray alloc] init];
+
+      for (int i = 0; i < discoveredPeripherals.count; i++) {
+        discoveredPeripheral = [discoveredPeripherals objectAtIndex:i];
+        NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+
+        [dict setValue: discoveredPeripheral.peripheral.name forKey:@"name"];
+        [dict setValue: [discoveredPeripheral uuid] forKey:@"uuid"];
+
+        [mappedDiscoveredPeripherals addObject:dict];
+      }
+
+      CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:mappedDiscoveredPeripherals];
+      [pluginResult setKeepCallbackAsBool:TRUE];
+      [self.commandDelegate sendPluginResult:pluginResult callbackId:_keptCallbackId];
+    });
+
+  }
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (void)bluetoothStateTimer:(NSTimer *)timer {
-    
-    NSString *callbackId = [timer userInfo];
-    CDVPluginResult *pluginResult = nil;
+//
+// Private Methods
+//
 
-    int bluetoothState = [[_bleShield CM] state];
-    
-    BOOL enabled = bluetoothState == CBCentralManagerStatePoweredOn;
-    
-    if (enabled) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    } else {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsInt:bluetoothState];
-    }
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+- (void) startScan {
+  if(state == IDLE) {
+    NSDictionary *dictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:1] forKey:CBCentralManagerScanOptionAllowDuplicatesKey];
+    [cbCentralManager scanForPeripheralsWithServices:nil options:dictionary];
+    [self setState: SCANNING];
+  }
 }
 
-#pragma mark - internal implemetation
-
-- (NSString*)readUntilDelimiter: (NSString*) delimiter {
-    
-    NSRange range = [_buffer rangeOfString: delimiter];    
-    NSString *message = @"";
-    
-    if (range.location != NSNotFound) {
-
-        int end = range.location + range.length;
-        message = [_buffer substringToIndex:end];
-        
-        NSRange truncate = NSMakeRange(0, end);
-        [_buffer deleteCharactersInRange:truncate];
-    }
-    return message;
+- (void) stopScan {
+  if(state == SCANNING) {
+    [cbCentralManager stopScan];
+    [self setState: IDLE];
+  }
 }
 
-- (NSMutableArray*) getPeripheralList {
-    
-    NSMutableArray *peripherals = [NSMutableArray array];
-    
-    for (int i = 0; i < _bleShield.peripherals.count; i++) {
-        NSMutableDictionary *peripheral = [NSMutableDictionary dictionary];
-        CBPeripheral *p = [_bleShield.peripherals objectAtIndex:i];
-        
-        if (p.UUID != NULL) {
-            // Seriously WTF?
-            CFStringRef s = CFUUIDCreateString(NULL, p.UUID);
-            NSString *uuid = [NSString stringWithCString:CFStringGetCStringPtr(s, 0)
-                                                encoding:(NSStringEncoding)NSUTF8StringEncoding];
-            [peripheral setObject: uuid forKey: @"uuid"];
-        }
-        else {
-            [peripheral setObject: @"" forKey: @"uuid"];
-        }
-        
-        NSString *name = [p name];
-        if (!name) {
-            name = [peripheral objectForKey:@"uuid"];
-        }
-        [peripheral setObject: name forKey: @"name"];
-        [peripherals addObject:peripheral];
-    }
-    
-    return peripherals;
+- (void) setState: (PLUGIN_State) newState {
+  NSString *old = [self stateToString: state];
+  NSString *new = [self stateToString: newState];
+  NSLog(@"**** state change **** %@ -> %@", old, new);
+  state = newState;
 }
 
-// calls the JavaScript subscriber with data if we hit the _delimiter
-- (void) sendDataToSubscriber {
-    
-    NSString *message = [self readUntilDelimiter:_delimiter];
-
-    if ([message length] > 0) {
-        CDVPluginResult *pluginResult = nil;
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: message];
-        [pluginResult setKeepCallbackAsBool:TRUE];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:_subscribeCallbackId];
-    }
-    
+- (NSString*) stateToString: (PLUGIN_State) testState {
+  switch (testState) {
+    case DEALLOCATED:
+      return @"DEALLOCATED";
+    case IDLE:
+      return @"DEALLOCATED";
+    case CONNECTING:
+      return @"CONNECTING";
+    case DISCONNECTING:
+      return @"DISCONNECTING";
+    case CONNECTED:
+      return @"CONNECTED";
+    case SCANNING:
+      return @"SCANNING";
+  }
 }
 
-// Ideally we'd get a callback when found, maybe _bleShield can be modified
-// to callback on centralManager:didRetrievePeripherals. For now, use a timer.
-- (void)scanForBLEPeripherals:(int)timeout {
-    
-    NSLog(@"Scanning for BLE Peripherals");
-    
-    // disconnect
-    if (_bleShield.activePeripheral) {
-        if(_bleShield.activePeripheral.isConnected)
-        {
-            [[_bleShield CM] cancelPeripheralConnection:[_bleShield activePeripheral]];
-            return;
-        }
+- (DiscoveredPeripheral*) findDiscoveredPeripheralByUUID: (NSString*) uuid {
+  DiscoveredPeripheral *discoveredPeripheral = nil;
+  NSString *discoveredUUID = nil;
+
+  for (int i = 0; i < discoveredPeripherals.count; i++) {
+    discoveredPeripheral = [discoveredPeripherals objectAtIndex:i];
+    discoveredUUID = [discoveredPeripheral uuid];
+    if ([uuid isEqualToString:discoveredUUID]) {
+      return discoveredPeripheral;
     }
-    
-    // remove existing peripherals
-    if (_bleShield.peripherals) {
-        _bleShield.peripherals = nil;
-    }
-    
-    [_bleShield findBLEPeripherals:timeout];
+  }
+
+  return nil;
 }
 
-- (void)connectToFirstDevice {
-        
-    [self scanForBLEPeripherals:3];
-    
-    [NSTimer scheduledTimerWithTimeInterval:(float)3.0
-                                     target:self
-                                   selector:@selector(connectFirstDeviceTimer:)
-                                   userInfo:nil
-                                    repeats:NO];    
+//
+// CBCentralManagerDelegate methods
+//
+- (void) centralManager: (CBCentralManager *) central didDiscoverPeripheral: (CBPeripheral *) peripheral advertisementData: (NSDictionary *) advertisementData RSSI: (NSNumber *) RSSI {
+
+  if((state != SCANNING) || (peripheral == nil)) { return; }
+
+  bool new = TRUE;
+  DiscoveredPeripheral* discPeripheral;
+
+  for(int i = 0; (i < discoveredPeripherals.count) && (new == TRUE); i++) {
+    discPeripheral = [discoveredPeripherals objectAtIndex:i];
+    new = (discPeripheral.peripheral != peripheral);
+  }
+
+  if(new == TRUE) {
+    discPeripheral = [[DiscoveredPeripheral alloc] initWithPeripheral:peripheral andAdvertisment:advertisementData andRssi:RSSI];
+    [discoveredPeripherals addObject:discPeripheral];
+  }
 }
 
-- (void)connectToUUID:(NSString *)uuid {
-    
-    int interval = 0;
-    
-    if (_bleShield.peripherals.count < 1) {
-        interval = 3;
-        [self scanForBLEPeripherals:interval];
-    }
-    
-    [NSTimer scheduledTimerWithTimeInterval:interval
-                                     target:self
-                                   selector:@selector(connectUuidTimer:)
-                                   userInfo:uuid
-                                    repeats:NO];
+- (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)peripheral {
+  NSString *uuid = [DiscoveredPeripheral uuidToString:peripheral.UUID];
+
+  if(state == CONNECTING) {
+    [self setState: CONNECTED];
+    connectedPeripheral = [self findDiscoveredPeripheralByUUID:uuid];
+    connectedPeripheral.state = DP_STATE_CONNECTED;
+
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:_keptCallbackId];
+  } else {
+    NSLog(@"!!!! didConnectPeripheral called when not CONNECTING!!!");
+  }
 }
 
-- (CBPeripheral*)findPeripheralByUUID:(NSString*)uuid {
-    
-    NSMutableArray *peripherals = [_bleShield peripherals];
-    CBPeripheral *peripheral = nil;
-        
-    for (CBPeripheral *p in peripherals) {
+- (void)centralManager:(CBCentralManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error {
+  NSString *uuid = [DiscoveredPeripheral uuidToString:peripheral.UUID];
+  DiscoveredPeripheral *disconnectedPeripheral = [self findDiscoveredPeripheralByUUID:uuid];
+  disconnectedPeripheral.state = DP_STATE_IDLE;
+  [self setState: IDLE];
+  connectedPeripheral = nil;
 
-        NSString *other = [NSString stringWithUTF8String:[_bleShield UUIDToString:p.UUID]];
-        
-        if ([uuid isEqualToString:other]) {
-            peripheral = p;
-            break;
-        }
-    }
-    return peripheral;
+  if(state == DISCONNECTING) {
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:_keptCallbackId];
+  } else if(state == CONNECTED) {
+    NSLog(@"!!!! didDisconnectPeripheral called when CONNECTED!!!");
+  } else {
+    NSLog(@"!!!! didDisconnectPeripheral called when not CONNECTED or DISCONNECTING!!!");
+  }
+}
+
+- (void)centralManager:(CBCentralManager *)central didFailToConnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error {
+  [self setState: IDLE];
+  if(state == CONNECTING) {
+    NSLog(@"!!!! didFailToConnectPeripheral called when CONNECTING!!!");
+  } else {
+    NSLog(@"!!!! didFailToConnectPeripheral called when not CONNECTING!!!");
+  }
+}
+
+- (void) centralManagerDidUpdateState: (CBCentralManager *) central {
+  if(central.state == CBCentralManagerStatePoweredOn) {
+    [cbCentralManager retrieveConnectedPeripherals];
+  }
 }
 
 @end

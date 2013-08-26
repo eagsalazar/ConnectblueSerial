@@ -7,8 +7,8 @@
 
 @interface SerialPortController : NSObject <SerialPortDelegate>
 
-- (void) initWithPeripherals: (NSMutableArray*) discoveredPeripherals;
-
-- (IBAction)sendMessage:(id)sender;
+//- (void) initWithPeripherals: (NSMutableArray*) discoveredPeripherals;
+//
+//- (IBAction)sendMessage:(id)sender;
 
 @end
