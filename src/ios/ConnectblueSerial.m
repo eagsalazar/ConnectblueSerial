@@ -171,12 +171,9 @@ typedef enum {
 //
 // Private Methods
 //
-
 - (void) onData: (NSData*) data {
   if(_subscribeCallbackId != nil) {
-    // FIXME - right encoding?
-    NSString *str = [[NSString alloc] initWithBytes:data.bytes length:data.length encoding:NSUTF8StringEncoding];
-    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: str];
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArrayBuffer: data];
     [pluginResult setKeepCallbackAsBool:TRUE];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:_subscribeCallbackId];
   }

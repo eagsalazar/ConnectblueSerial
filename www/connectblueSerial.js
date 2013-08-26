@@ -16,6 +16,7 @@ cordova.define('ConnectblueSerial', function (require, exports, module) {
       cordova.exec(success, failure, "ConnectblueSerial", "write", [data]);
     },
 
+    // Update will return data as ArrayBuffer
     subscribe: function (update, failure) {
       cordova.exec(update, failure, "ConnectblueSerial", "subscribe", []);
     },
