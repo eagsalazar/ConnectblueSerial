@@ -57,7 +57,7 @@ typedef enum {
 
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
     [pluginResult setKeepCallbackAsBool:TRUE];
-    _keptCallbackId = [command.callbackId copy];
+    _connectCallbackId = [command.callbackId copy];
 
     NSString* uuid = [command.arguments objectAtIndex:0];
     DiscoveredPeripheral *discoveredPeripheral = [self findDiscoveredPeripheralByUUID: uuid];
@@ -78,7 +78,7 @@ typedef enum {
       [self setState: DISCONNECTING];
       pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
       [pluginResult setKeepCallbackAsBool:TRUE];
-      _keptCallbackId = [command.callbackId copy];
+      _disconnectCallbackId = [command.callbackId copy];
       connectedPeripheral.state = DP_STATE_DISCONNECTING;
     } else {
       [self setState: IDLE];
@@ -102,7 +102,7 @@ typedef enum {
   } else {
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
     [pluginResult setKeepCallbackAsBool:TRUE];
-    _keptCallbackId = [command.callbackId copy];
+    _listCallbackId = [command.callbackId copy];
 
     [self startScan];
 
@@ -127,7 +127,7 @@ typedef enum {
 
       CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:mappedDiscoveredPeripherals];
       [pluginResult setKeepCallbackAsBool:TRUE];
-      [self.commandDelegate sendPluginResult:pluginResult callbackId:_keptCallbackId];
+      [self.commandDelegate sendPluginResult:pluginResult callbackId:_listCallbackId];
     });
 
   }
@@ -148,16 +148,38 @@ typedef enum {
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
+- (void) subscribe: (CDVInvokedUrlCommand *) command {
+  CDVPluginResult *pluginResult = nil;
+
+  if (state != CONNECTED) {
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Must connect before subscribe!"];
+  } else {
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    _subscribeCallbackId = [command.callbackId copy];
+  }
+
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void) unsubscribe: (CDVInvokedUrlCommand *) command {
+  CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+  _subscribeCallbackId = nil;
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
 //
 // Private Methods
 //
 
 - (void) onData: (NSData*) data {
-  // FIXME - right encoding?
-  // FIXME - connect to callback from connect somehow...
-  NSString *str = [[NSString alloc] initWithBytes:data.bytes length:data.length encoding:NSUTF8StringEncoding];
-  NSLog(@"GOT SOME DATA: %@", data);
-  NSLog(@"GOT SOME STRING: %@", str);
+  if(_subscribeCallbackId != nil) {
+    // FIXME - right encoding?
+    NSString *str = [[NSString alloc] initWithBytes:data.bytes length:data.length encoding:NSUTF8StringEncoding];
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: str];
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:_subscribeCallbackId];
+  }
 }
 
 - (void) startScan {
@@ -247,7 +269,7 @@ typedef enum {
 
     CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [pluginResult setKeepCallbackAsBool:TRUE];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:_keptCallbackId];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
   } else {
     NSLog(@"!!!! didConnectPeripheral called when not CONNECTING!!!");
   }
@@ -263,7 +285,7 @@ typedef enum {
   if(state == DISCONNECTING) {
     CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [pluginResult setKeepCallbackAsBool:TRUE];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:_keptCallbackId];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:_disconnectCallbackId];
   } else if(state == CONNECTED) {
     NSLog(@"!!!! didDisconnectPeripheral called when CONNECTED!!!");
   } else {
@@ -274,7 +296,9 @@ typedef enum {
 - (void)centralManager:(CBCentralManager *)central didFailToConnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error {
   [self setState: IDLE];
   if(state == CONNECTING) {
-    NSLog(@"!!!! didFailToConnectPeripheral called when CONNECTING!!!");
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Failed to Connect!"];
+    [pluginResult setKeepCallbackAsBool:TRUE];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
   } else {
     NSLog(@"!!!! didFailToConnectPeripheral called when not CONNECTING!!!");
   }

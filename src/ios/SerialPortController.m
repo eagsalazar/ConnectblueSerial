@@ -30,7 +30,7 @@
   [self writeFromFifo];
 }
 
-- (void)dealloc {
+- (void) dealloc {
   [serialPort close];
 }
 
@@ -40,16 +40,17 @@
   NSUInteger len;
   NSRange range;
 
-  if(txQueue.count > 0) {
+  if(txQueue.count > 0 && serialPort.isOpen == TRUE) {
     NSString* message = [txQueue objectAtIndex:0];
     range.location = 0;
     range.length = message.length;
 
-    if(serialPort.isOpen == TRUE) {
-      [message getBytes:buf maxLength:SP_MAX_WRITE_SIZE usedLength:&len encoding:NSUTF8StringEncoding options:NSStringEncodingConversionAllowLossy range:range remainingRange:&range];
-      data = [NSData dataWithBytes:buf length:len];
-      [serialPort write: data];
-    }
+    [message getBytes:buf maxLength:SP_MAX_WRITE_SIZE usedLength:&len encoding:NSUTF8StringEncoding options:NSStringEncodingConversionAllowLossy range:range remainingRange:&range];
+    data = [NSData dataWithBytes:buf length:len];
+    NSLog(@"*** WRITE: %@", data);
+    [serialPort write: data];
+
+    [txQueue removeObjectAtIndex: 0];
   }
 }
 
