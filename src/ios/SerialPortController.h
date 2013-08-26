@@ -4,11 +4,13 @@
 
 #import <UIKit/UIKit.h>
 #import "SerialPort.h"
+#import "DiscoveredPeripheral.h"
 
 @interface SerialPortController : NSObject <SerialPortDelegate>
+- (SerialPortController*) initWithPeripheral: (DiscoveredPeripheral*) dp andDataReceiverDelegate: (id) del;
+- (void) write: (NSString*) message;
+@end
 
-- (void) initWithPeripherals: (NSMutableArray*) discoveredPeripherals;
-
-- (IBAction)sendMessage:(id)sender;
-
+@protocol DataReceiverDelegate <NSObject>
+- (void) onData: (NSData*) data;
 @end

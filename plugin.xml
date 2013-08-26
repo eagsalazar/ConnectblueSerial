@@ -25,23 +25,16 @@
       </feature>
     </config-file>
 
-    <header-file src="src/ios/BLE.h" target-dir="ConnectblueSerial" />
-    <source-file src="src/ios/BLE.m" target-dir="ConnectblueSerial" />
     <header-file src="src/ios/BLEDefinitions.h" target-dir="ConnectblueSerial" />
     <source-file src="src/ios/BLEDefinitions.m" target-dir="ConnectblueSerial" />
     <header-file src="src/ios/DiscoveredPeripheral.h" target-dir="ConnectblueSerial" />
     <source-file src="src/ios/DiscoveredPeripheral.m" target-dir="ConnectblueSerial" />
-    <header-file src="src/ios/ScanController.h" target-dir="ConnectblueSerial" />
-    <source-file src="src/ios/ScanController.m" target-dir="ConnectblueSerial" />
     <header-file src="src/ios/SerialPort.h" target-dir="ConnectblueSerial" />
     <source-file src="src/ios/SerialPort.m" target-dir="ConnectblueSerial" />
     <header-file src="src/ios/SerialPortController.h" target-dir="ConnectblueSerial" />
     <source-file src="src/ios/SerialPortController.m" target-dir="ConnectblueSerial" />
-    <header-file src="src/ios/ChatMessage.h" target-dir="ConnectblueSerial" />
-    <source-file src="src/ios/ChatMessage.m" target-dir="ConnectblueSerial" />
     <header-file src="src/ios/ConnectblueSerial.h" target-dir="ConnectblueSerial" />
     <source-file src="src/ios/ConnectblueSerial.m" target-dir="ConnectblueSerial" />
-    <header-file src="src/ios/BLEDefines.h" target-dir="ConnectblueSerial" />
 
     <framework src="Foundation.framework" />
     <framework src="CoreBluetooth.framework" />
