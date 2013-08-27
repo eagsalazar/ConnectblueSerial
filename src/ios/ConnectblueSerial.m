@@ -22,6 +22,7 @@ typedef enum {
 - (void) setState: (PLUGIN_State) newState;
 - (NSString*) stateToString: (PLUGIN_State) testState;
 - (DiscoveredPeripheral*) findDiscoveredPeripheralByUUID: (NSString*) uuid;
+- (double) parseMV: (NSData*) data;
 @end
 
 @implementation ConnectblueSerial {
@@ -172,11 +173,60 @@ typedef enum {
 // Private Methods
 //
 - (void) onData: (NSData*) data {
+  double mV;
+
   if(_subscribeCallbackId != nil) {
-    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArrayBuffer: data];
+    const char *firstChar = (const char *)[data bytes];
+    CDVPluginResult *pluginResult = nil;
+    NSUInteger length;
+
+    length = [data length];
+
+    if(strstr(firstChar,"A") && length == 6) {
+      mV = [self parseMV: data];
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDouble: mV];
+    } else if (strstr(firstChar,"T") && length == 6) {
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: @"T"];
+    }
+
     [pluginResult setKeepCallbackAsBool:TRUE];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:_subscribeCallbackId];
   }
+}
+
+- (double) parseMV: (NSData*) data {
+  const unsigned char *bytes = [data bytes];
+  double mV;
+
+  int32_t copy, shifted, accumulated;
+
+  copy = bytes[2];
+  shifted = copy << 24;
+  accumulated = shifted;
+
+  copy = bytes[3];
+  shifted = copy << 16;
+  accumulated += shifted;
+
+  copy = bytes[4];
+  shifted = copy << 8;
+  accumulated += shifted;
+
+  copy = bytes[5];
+  shifted = copy;
+  accumulated += shifted;
+
+  accumulated <<= 3;
+  accumulated >>= 8;
+
+  mV = (double)accumulated;
+  mV *= 2048;
+  mV /= 16777216;
+
+  if(bytes[2] & 32)
+    mV *= -1;
+
+  return -mV;
 }
 
 - (void) startScan {
