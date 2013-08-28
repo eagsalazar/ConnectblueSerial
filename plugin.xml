@@ -15,7 +15,7 @@
   </engines>
 
   <js-module src="www/connectblueSerial.js" name="connectblueSerial">
-    <clobbers target="connectblueSerial" />
+    <clobbers target="plugins/connectblueSerial" />
   </js-module>
 
   <platform name="ios">
