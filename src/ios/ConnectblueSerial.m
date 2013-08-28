@@ -314,7 +314,11 @@ typedef enum {
 
     serialPortController = [[SerialPortController alloc] initWithPeripheral: connectedPeripheral andDataReceiverDelegate: self];
 
-    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    NSMutableDictionary *deviceInfo = [[NSMutableDictionary alloc] init];
+    [deviceInfo setValue: connectedPeripheral.peripheral.name forKey:@"name"];
+    [deviceInfo setValue: [connectedPeripheral uuid] forKey:@"uuid"];
+
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary: deviceInfo];
     [pluginResult setKeepCallbackAsBool:TRUE];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
   } else {
@@ -326,8 +330,6 @@ typedef enum {
   NSString *uuid = [DiscoveredPeripheral uuidToString:peripheral.UUID];
   DiscoveredPeripheral *disconnectedPeripheral = [self findDiscoveredPeripheralByUUID:uuid];
   disconnectedPeripheral.state = DP_STATE_IDLE;
-  [self setState: IDLE];
-  connectedPeripheral = nil;
 
   if(state == DISCONNECTING) {
     CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
@@ -338,6 +340,9 @@ typedef enum {
   } else {
     NSLog(@"!!!! didDisconnectPeripheral called when not CONNECTED or DISCONNECTING!!!");
   }
+
+  [self setState: IDLE];
+  connectedPeripheral = nil;
 }
 
 - (void)centralManager:(CBCentralManager *)central didFailToConnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error {
