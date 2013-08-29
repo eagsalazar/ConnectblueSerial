@@ -27,9 +27,18 @@
 }
 
 + (NSString*) uuidToString: (CFUUIDRef) UUID {
-  CFStringRef s = CFUUIDCreateString(NULL, UUID);
-  NSString *str = [NSString stringWithCString:CFStringGetCStringPtr(s, 0) encoding: [NSString defaultCStringEncoding]];
+  CFStringRef cStr = CFUUIDCreateString(NULL, UUID);
+  NSString *str = (__bridge NSString *) cStr;
   return str;
 }
+
+- (BOOL) isEqual: (DiscoveredPeripheral*) other {
+  return [self.peripheral isEqual: other.peripheral];
+}
+
+- (NSUInteger) hash {
+  return [self.peripheral hash];
+}
+
 
 @end

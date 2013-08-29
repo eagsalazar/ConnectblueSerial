@@ -107,7 +107,7 @@ typedef enum {
 
     [self startScan];
 
-    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, 5.0 * NSEC_PER_SEC);
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, 20.0 * NSEC_PER_SEC);
     dispatch_after(popTime, dispatch_get_main_queue(), ^{
       NSLog(@"discoveredPeripherals: %@", discoveredPeripherals);
       DiscoveredPeripheral* discoveredPeripheral;
@@ -182,11 +182,14 @@ typedef enum {
 
     length = [data length];
 
+    NSLog(@"^^^^^ firstChar: %c, length %d", firstChar[0], length);
     if(strstr(firstChar,"A") && length == 6) {
       mV = [self parseMV: data];
       pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDouble: mV];
-    } else if (strstr(firstChar,"T") && length == 6) {
+    } else if (strstr(firstChar,"T") && length == 5) {
       pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: @"T"];
+    } else {
+      return;
     }
 
     [pluginResult setKeepCallbackAsBool:TRUE];
@@ -290,17 +293,14 @@ typedef enum {
 
   if((state != SCANNING) || (peripheral == nil)) { return; }
 
-  bool new = TRUE;
-  DiscoveredPeripheral* discPeripheral;
+  DiscoveredPeripheral* discoveredPeripheral = [[DiscoveredPeripheral alloc] initWithPeripheral:peripheral andAdvertisment:advertisementData andRssi:RSSI];
 
-  for(int i = 0; (i < discoveredPeripherals.count) && (new == TRUE); i++) {
-    discPeripheral = [discoveredPeripherals objectAtIndex:i];
-    new = (discPeripheral.peripheral != peripheral);
-  }
-
-  if(new == TRUE) {
-    discPeripheral = [[DiscoveredPeripheral alloc] initWithPeripheral:peripheral andAdvertisment:advertisementData andRssi:RSSI];
-    [discoveredPeripherals addObject:discPeripheral];
+  if([discoveredPeripherals containsObject:discoveredPeripheral]) {
+    NSInteger index = [discoveredPeripherals indexOfObject:discoveredPeripheral];
+    [discoveredPeripherals replaceObjectAtIndex:index withObject:discoveredPeripheral];
+  } else {
+    [cbCentralManager connectPeripheral:peripheral options:nil];
+    [discoveredPeripherals addObject:discoveredPeripheral];
   }
 }
 
@@ -321,6 +321,8 @@ typedef enum {
     CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary: deviceInfo];
     [pluginResult setKeepCallbackAsBool:TRUE];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
+  } else if(state == SCANNING) {
+    NSLog(@"!!!! didConnectPeripheral called when SCANNING (it's all good)");
   } else {
     NSLog(@"!!!! didConnectPeripheral called when not CONNECTING!!!");
   }
