@@ -16,6 +16,10 @@
 #define SERIAL_PORT_SERVICE_UUID_LEN    (16)
 #define CHARACT_UUID_SERIAL_LEN         (16)
 
+extern const unsigned char deviceIdServiceUuid[SERVICE_UUID_DEFAULT_LEN];
+extern const unsigned char modelNumberCharactUuid[CHARACT_UUID_DEFAULT_LEN];
+extern const unsigned char firmwareRevisionCharactUuid[CHARACT_UUID_DEFAULT_LEN];
+
 extern const unsigned char accServiceUuid[SERVICE_UUID_DEFAULT_LEN];
 extern const unsigned char accRangeCharactUuid[CHARACT_UUID_DEFAULT_LEN];
 extern const unsigned char accXCharactUuid[CHARACT_UUID_DEFAULT_LEN];

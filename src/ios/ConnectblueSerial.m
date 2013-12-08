@@ -27,6 +27,7 @@ typedef enum {
 
 @implementation ConnectblueSerial {
   PLUGIN_State state;
+  NSMutableData *dataBuffer;
   CBCentralManager *cbCentralManager;
 }
 
@@ -34,6 +35,7 @@ typedef enum {
   [super pluginInitialize];
   cbCentralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil];
   [self setState: IDLE];
+  dataBuffer = [[NSMutableData alloc] initWithLength: 0];
   discoveredPeripherals = [[NSMutableArray alloc] init];
 }
 
@@ -50,6 +52,8 @@ typedef enum {
 
 - (void) connect: (CDVInvokedUrlCommand *) command {
   CDVPluginResult *pluginResult = nil;
+
+  NSLog(@"API CALL - connect");
 
   if (state != IDLE) {
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Already scanning!"];
@@ -72,6 +76,8 @@ typedef enum {
 
 - (void) disconnect: (CDVInvokedUrlCommand *) command {
   CDVPluginResult *pluginResult = nil;
+
+  NSLog(@"API CALL - disconnect");
 
   if (state == CONNECTED || state == CONNECTING) {
 
@@ -97,6 +103,8 @@ typedef enum {
 
 - (void) list: (CDVInvokedUrlCommand*) command {
     CDVPluginResult* pluginResult = nil;
+
+  NSLog(@"API CALL - list");
 
   if (state != IDLE) {
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Already scanning!"];
@@ -138,6 +146,8 @@ typedef enum {
 - (void) write: (CDVInvokedUrlCommand *) command {
   CDVPluginResult *pluginResult = nil;
 
+  NSLog(@"API CALL - write");
+
   if (state == CONNECTED) {
     NSString* data = [command.arguments objectAtIndex:0];
     [serialPortController write: data];
@@ -151,6 +161,8 @@ typedef enum {
 
 - (void) subscribe: (CDVInvokedUrlCommand *) command {
   CDVPluginResult *pluginResult = nil;
+
+  NSLog(@"API CALL - subscribe");
 
   if (state != CONNECTED) {
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Must connect before subscribe!"];
@@ -173,21 +185,31 @@ typedef enum {
 // Private Methods
 //
 - (void) onData: (NSData*) data {
-  double mV;
-
   if(_subscribeCallbackId != nil) {
-    const char *firstChar = (const char *)[data bytes];
+
+    double mV;
+    const char *firstChar = (const char *)[dataBuffer bytes];
+    const char *firstNewChar = (const char *)[data bytes];
     CDVPluginResult *pluginResult = nil;
     NSUInteger length;
 
-    length = [data length];
+    if(strstr(firstNewChar,"A") || strstr(firstNewChar,"T")) {
+      [dataBuffer setLength: 0];
+    }
+
+    [dataBuffer appendData: data];
+    length = [dataBuffer length];
 
     NSLog(@"^^^^^ firstChar: %c, length %d", firstChar[0], length);
+    NSLog(@"^^^^^ firstNewChar: %c", firstNewChar[0]);
+
     if(strstr(firstChar,"A") && length == 6) {
-      mV = [self parseMV: data];
+      mV = [self parseMV: dataBuffer];
       pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDouble: mV];
+      [dataBuffer setLength: 0];
     } else if (strstr(firstChar,"T") && length == 5) {
       pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: @"T"];
+      [dataBuffer setLength: 0];
     } else {
       return;
     }
