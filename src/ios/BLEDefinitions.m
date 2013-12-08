@@ -2,9 +2,6 @@
 //  BLEDefinitions.m
 //  BLEDemo
 //
-//  Created by Tomas Henriksson on 1/18/12.
-//  Copyright (c) 2012 connectBlue. All rights reserved.
-//
 
 #import "BLEDefinitions.h"
 

@@ -2,9 +2,6 @@
 //  DiscoveredPeripheral.h
 //  BLEDemo
 //
-//  Created by Tomas Henriksson on 12/15/11.
-//  Copyright (c) 2011 connectBlue. All rights reserved.
-//
 
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CBCentralManager.h>

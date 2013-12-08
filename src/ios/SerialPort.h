@@ -2,9 +2,6 @@
 //  SerialPort.h
 //  BLEDemo
 //
-//  Created by Tomas Henriksson on 1/4/12.
-//  Copyright (c) 2012 connectBlue. All rights reserved.
-//
 
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CBPeripheral.h>

@@ -2,9 +2,6 @@
 //  DiscoveredPeripheral.m
 //  BLEDemo
 //
-//  Created by Tomas Henriksson on 12/15/11.
-//  Copyright (c) 2011 connectBlue. All rights reserved.
-//
 
 #import "DiscoveredPeripheral.h"
 
