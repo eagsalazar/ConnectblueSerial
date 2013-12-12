@@ -40,7 +40,9 @@ typedef enum {
 }
 
 - (void) dealloc {
-  [cbCentralManager stopScan];
+  if(cbCentralManager.state == CBCentralManagerStatePoweredOn) {
+    [cbCentralManager stopScan];
+  }
   cbCentralManager = nil;
   [self setState: DEALLOCATED];
 }
@@ -256,15 +258,19 @@ typedef enum {
 
 - (void) startScan {
   if(state == IDLE) {
-    NSDictionary *dictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:1] forKey:CBCentralManagerScanOptionAllowDuplicatesKey];
-    [cbCentralManager scanForPeripheralsWithServices:nil options:dictionary];
+    if(cbCentralManager.state == CBCentralManagerStatePoweredOn) {
+      NSDictionary *dictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:1] forKey:CBCentralManagerScanOptionAllowDuplicatesKey];
+      [cbCentralManager scanForPeripheralsWithServices:nil options:dictionary];
+    }
     [self setState: SCANNING];
   }
 }
 
 - (void) stopScan {
   if(state == SCANNING) {
-    [cbCentralManager stopScan];
+    if(cbCentralManager.state == CBCentralManagerStatePoweredOn) {
+      [cbCentralManager stopScan];
+    }
     [self setState: IDLE];
   }
 }
