@@ -47,7 +47,7 @@
 
     [message getBytes:buf maxLength:SP_MAX_WRITE_SIZE usedLength:&len encoding:NSUTF8StringEncoding options:NSStringEncodingConversionAllowLossy range:range remainingRange:&range];
     data = [NSData dataWithBytes:buf length:len];
-    NSLog(@"*** WRITE: %@", data);
+    NSLog(@"*** WRITE: %@", message);
     [serialPort write: data];
 
     [txQueue removeObjectAtIndex: 0];
