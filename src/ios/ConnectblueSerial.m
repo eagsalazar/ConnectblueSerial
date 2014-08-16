@@ -115,7 +115,7 @@ typedef enum {
 
     [self startScan];
 
-    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, 20.0 * NSEC_PER_SEC);
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, 10.0 * NSEC_PER_SEC);
     dispatch_after(popTime, dispatch_get_main_queue(), ^{
       NSLog(@"discoveredPeripherals: %@", discoveredPeripherals);
       DiscoveredPeripheral* discoveredPeripheral;
@@ -247,9 +247,6 @@ typedef enum {
   mV = (double)accumulated;
   mV *= 2048;
   mV /= 16777216;
-
-  if(bytes[2] & 32)
-    mV *= -1;
 
   return -mV;
 }
