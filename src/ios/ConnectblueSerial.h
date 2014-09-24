@@ -14,13 +14,25 @@
   NSString *_onDataCallbackId;
   NSString *_connectCallbackId;
   NSString *_disconnectCallbackId;
-  NSString *_listCallbackId;
+  NSString *_scanCallbackId;
   NSString *_subscribeCallbackId;
 }
 
-- (void) list: (CDVInvokedUrlCommand *) command;
+- (void) getState: (CDVInvokedUrlCommand *) command;
+
+// IDLE -> SCANNING
+- (void) scan: (CDVInvokedUrlCommand *) command;
+
+// SCANNING -> IDLE
+- (void) stopScan: (CDVInvokedUrlCommand *) command;
+
+// IDLE -> CONNECTING -> CONNECTED
 - (void) connect: (CDVInvokedUrlCommand *) command;
+
+// CONNECTED -> DISCONNECTING -> IDLE
 - (void) disconnect: (CDVInvokedUrlCommand *) command;
+
+// CONNECTED
 - (void) write: (CDVInvokedUrlCommand *) command;
 - (void) subscribe: (CDVInvokedUrlCommand *) command;
 - (void) unsubscribe: (CDVInvokedUrlCommand *) command;

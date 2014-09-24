@@ -1,7 +1,16 @@
 cordova.define('ConnectblueSerial', function (require, exports, module) {
   module.exports = {
-    list: function (success, failure) {
-      cordova.exec(success, failure, "ConnectblueSerial", "list", []);
+
+    getState: function (success, failure) {
+      cordova.exec(success, failure, "ConnectblueSerial", "getState", []);
+    },
+
+    scan: function (update, failure) {
+      cordova.exec(update, failure, "ConnectblueSerial", "scan", []);
+    },
+
+    stopScan: function (success, failure) {
+      cordova.exec(success, failure, "ConnectblueSerial", "stopScan", []);
     },
 
     connect: function (uuid, success, failure) {
