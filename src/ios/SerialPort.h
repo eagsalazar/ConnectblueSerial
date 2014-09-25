@@ -4,7 +4,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <CoreBluetooth/CBPeripheral.h>
+#import <CoreBluetooth/CoreBluetooth.h>
 #import "BLEDefinitions.h"
 
 #define SP_MAX_WRITE_SIZE   (20)

@@ -4,9 +4,8 @@
 //
 
 #import "SerialPort.h"
-#import <CoreBluetooth/CBUUID.h>
+#import <CoreBluetooth/CoreBluetooth.h>
 #import <CoreBluetooth/CBService.h>
-#import <CoreBluetooth/CBCharacteristic.h>
 #import <Foundation/Foundation.h>
 
 // If no ACK is used for writing, a "CoreBluetooth[ERROR] XPC connection interrupted, resetting" may occur

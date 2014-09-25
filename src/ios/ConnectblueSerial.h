@@ -3,7 +3,7 @@
 //
 #import <Cordova/CDV.h>
 #import <Cordova/CDVPlugin.h>
-#import <CoreBluetooth/CBCentralManager.h>
+#import <CoreBluetooth/CoreBluetooth.h>
 #import "SerialPortController.h"
 #import "DiscoveredPeripheral.h"
 

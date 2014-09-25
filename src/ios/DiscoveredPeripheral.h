@@ -4,8 +4,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <CoreBluetooth/CBCentralManager.h>
-#import <CoreBluetooth/CBPeripheral.h>
+#import <CoreBluetooth/CoreBluetooth.h>
 
 enum DiscoveredPeripheralState
 {

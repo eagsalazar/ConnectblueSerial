@@ -4,8 +4,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <CoreBluetooth/CBCharacteristic.h>
-#import <CoreBluetooth/CBUUID.h>
+#import <CoreBluetooth/CoreBluetooth.h>
 
 #define SERVICE_UUID_DEFAULT_LEN        (2)
 #define CHARACT_UUID_DEFAULT_LEN        (2)

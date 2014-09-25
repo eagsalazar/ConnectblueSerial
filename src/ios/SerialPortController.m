@@ -5,7 +5,7 @@
 #import "SerialPortController.h"
 #import "DiscoveredPeripheral.h"
 #import "SerialPort.h"
-#import <CoreBluetooth/CBPeripheral.h>
+#import <CoreBluetooth/CoreBluetooth.h>
 #import <Foundation/NSException.h>
 
 @implementation SerialPortController {

@@ -3,8 +3,6 @@
 //
 #import "ConnectblueSerial.h"
 #import <Cordova/CDV.h>
-#import <CoreBluetooth/CBCentralManager.h>
-#import <CoreBluetooth/CBPeripheral.h>
 #import "DiscoveredPeripheral.h"
 
 typedef enum {
