@@ -198,7 +198,7 @@ typedef enum {
     [dataBuffer appendData: data];
     length = [dataBuffer length];
 
-    NSLog(@"^^^^^ firstChar: %c, length %d", firstChar[0], length);
+    NSLog(@"^^^^^ firstChar: %c, length %lu", firstChar[0], (unsigned long)length);
     NSLog(@"^^^^^ firstNewChar: %c", firstNewChar[0]);
 
     if(strstr(firstChar,"A") && length == 6) {
@@ -267,7 +267,7 @@ typedef enum {
 - (void) setState: (PLUGIN_State) newState {
   NSString *old = [self stateToString: state];
   NSString *new = [self stateToString: newState];
-  NSLog(@"**** state change **** %@ -> %@", old, new);
+  //NSLog(@"**** state change **** %@ -> %@", old, new);
   state = newState;
 }
 
