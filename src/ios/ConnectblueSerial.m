@@ -376,8 +376,11 @@ typedef enum {
 }
 
 - (void) centralManagerDidUpdateState: (CBCentralManager *) central {
+  NSLog(@"!!!! centralManagerDidUpdateState called: %ld", central.state);
   if(central.state == CBCentralManagerStatePoweredOn) {
-    [cbCentralManager retrieveConnectedPeripherals];
+    [self setState: IDLE];
+  } else {
+    [self setState: DEALLOCATED];
   }
 }
 
