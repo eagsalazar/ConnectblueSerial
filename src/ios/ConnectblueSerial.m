@@ -104,6 +104,10 @@ typedef enum {
 
   NSLog(@"API CALL - list");
 
+  if(cbCentralManager.state != CBCentralManagerStatePoweredOn) {
+    return;
+  }
+
   if (state != IDLE) {
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Already scanning!"];
   } else {
