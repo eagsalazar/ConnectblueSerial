@@ -1,28 +1,35 @@
-cordova.define('ConnectblueSerial', function (require, exports, module) {
-  module.exports = {
-    list: function (success, failure) {
-      cordova.exec(success, failure, "ConnectblueSerial", "list", []);
-    },
+module.exports = {
 
-    connect: function (uuid, success, failure) {
-      cordova.exec(success, failure, "ConnectblueSerial", "connect", [uuid]);
-    },
+  initialize: function (update, failure) {
+    cordova.exec(update, failure, "ConnectblueSerial", "initialize", []);
+  },
 
-    disconnect: function (success, failure) {
-      cordova.exec(success, failure, "ConnectblueSerial", "disconnect", []);
-    },
+  scan: function (update, failure) {
+    cordova.exec(update, failure, "ConnectblueSerial", "scan", []);
+  },
 
-    write: function (data, success, failure) {
-      cordova.exec(success, failure, "ConnectblueSerial", "write", [data]);
-    },
+  stopScan: function (success, failure) {
+    cordova.exec(success, failure, "ConnectblueSerial", "stopScan", []);
+  },
 
-    subscribe: function (update, failure) {
-      cordova.exec(update, failure, "ConnectblueSerial", "subscribe", []);
-    },
+  connect: function (uuid, success, failure) {
+    cordova.exec(success, failure, "ConnectblueSerial", "connect", [uuid]);
+  },
 
-    unsubscribe: function (success, failure) {
-      cordova.exec(success, failure, "ConnectblueSerial", "unsubscribe", []);
-    }
+  disconnect: function (success, failure) {
+    cordova.exec(success, failure, "ConnectblueSerial", "disconnect", []);
+  },
 
-  };
-});
+  write: function (data, success, failure) {
+    cordova.exec(success, failure, "ConnectblueSerial", "write", [data]);
+  },
+
+  subscribe: function (update, failure) {
+    cordova.exec(update, failure, "ConnectblueSerial", "subscribe", []);
+  },
+
+  unsubscribe: function (success, failure) {
+    cordova.exec(success, failure, "ConnectblueSerial", "unsubscribe", []);
+  }
+
+};

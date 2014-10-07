@@ -7,18 +7,10 @@
 #import "SerialPortController.h"
 #import "DiscoveredPeripheral.h"
 
-@interface ConnectblueSerial : CDVPlugin <CBCentralManagerDelegate, DataReceiverDelegate> {
-  NSMutableArray *discoveredPeripherals;
-  DiscoveredPeripheral *connectedPeripheral;
-  SerialPortController *serialPortController;
-  NSString *_onDataCallbackId;
-  NSString *_connectCallbackId;
-  NSString *_disconnectCallbackId;
-  NSString *_listCallbackId;
-  NSString *_subscribeCallbackId;
-}
-
-- (void) list: (CDVInvokedUrlCommand *) command;
+@interface ConnectblueSerial : CDVPlugin <CBCentralManagerDelegate, DataReceiverDelegate>
+- (void) initialize: (CDVInvokedUrlCommand *) command;
+- (void) scan: (CDVInvokedUrlCommand *) command;
+- (void) stopScan: (CDVInvokedUrlCommand *) command;
 - (void) connect: (CDVInvokedUrlCommand *) command;
 - (void) disconnect: (CDVInvokedUrlCommand *) command;
 - (void) write: (CDVInvokedUrlCommand *) command;

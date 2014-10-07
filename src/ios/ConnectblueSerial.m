@@ -5,42 +5,44 @@
 #import <Cordova/CDV.h>
 #import "DiscoveredPeripheral.h"
 
-typedef enum {
-  DEALLOCATED,
-  IDLE,
-  CONNECTING,
-  DISCONNECTING,
-  CONNECTED,
-  SCANNING
-} PLUGIN_State;
-
 @interface ConnectblueSerial()
-- (void) startScan;
-- (void) stopScan;
-- (void) setState: (PLUGIN_State) newState;
-- (NSString*) stateToString: (PLUGIN_State) testState;
-- (DiscoveredPeripheral*) findDiscoveredPeripheralByUUID: (NSString*) uuid;
+- (void) onDidDiscoverPeripheral;
+- (void) onData: (NSData*) data;
+- (void) disconnectCleanly;
+- (DiscoveredPeripheral*) findInDiscoveredPeripheralsByUUID: (NSString*) uuid;
 - (double) parseMV: (NSData*) data;
 @end
 
 @implementation ConnectblueSerial {
-  PLUGIN_State state;
   NSMutableData *dataBuffer;
   CBCentralManager *cbCentralManager;
+
+  NSMutableArray *discoveredPeripherals;
+  DiscoveredPeripheral *connectedPeripheral;
+  SerialPortController *serialPortController;
+  NSString *_initializeCallbackId;
+  NSString *_onDataCallbackId;
+  NSString *_connectCallbackId;
+  NSString *_disconnectCallbackId;
+  NSString *_scanCallbackId;
+  NSString *_subscribeCallbackId;
 }
 
 - (void) pluginInitialize {
   [super pluginInitialize];
   cbCentralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil];
-  [self setState: IDLE];
   dataBuffer = [[NSMutableData alloc] initWithLength: 0];
-  discoveredPeripherals = [[NSMutableArray alloc] init];
 }
 
 - (void) dealloc {
   [cbCentralManager stopScan];
   cbCentralManager = nil;
-  [self setState: DEALLOCATED];
+}
+
+- (void) onAppTerminate {
+  NSLog(@"💋  onAppTerminate! - disconnecting");
+  [self disconnectCleanly];
+  [super onAppTerminate];
 }
 
 
@@ -48,25 +50,59 @@ typedef enum {
 // Plugin Methods
 //
 
+- (void) initialize: (CDVInvokedUrlCommand*) command {
+  NSLog(@"💋 🎷  API CALL - initialize");
+  CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+  [pluginResult setKeepCallbackAsBool:TRUE];
+  _initializeCallbackId = [command.callbackId copy];
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void) scan:(CDVInvokedUrlCommand*) command {
+  CDVPluginResult *pluginResult = nil;
+  NSLog(@"💋 🎷  API CALL - scan");
+
+  discoveredPeripherals = [[NSMutableArray alloc] init];
+  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+  [pluginResult setKeepCallbackAsBool:TRUE];
+  _scanCallbackId = [command.callbackId copy];
+
+  NSDictionary *dictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:YES] forKey:CBCentralManagerScanOptionAllowDuplicatesKey];
+  [cbCentralManager scanForPeripheralsWithServices:nil options:dictionary];
+
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void) stopScan:(CDVInvokedUrlCommand*) command {
+  CDVPluginResult *pluginResult = nil;
+  NSLog(@"💋 🎷  API CALL - stopScan");
+
+  [cbCentralManager stopScan];
+  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+  _scanCallbackId = nil;
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
 - (void) connect: (CDVInvokedUrlCommand *) command {
   CDVPluginResult *pluginResult = nil;
+  NSLog(@"💋 🎷  API CALL - connect");
 
-  NSLog(@"API CALL - connect");
-
-  if (state != IDLE) {
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Already scanning!"];
-  } else {
-    [self setState: CONNECTING];
-
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
-    [pluginResult setKeepCallbackAsBool:TRUE];
-    _connectCallbackId = [command.callbackId copy];
-
+  if (connectedPeripheral == nil) {
     NSString* uuid = [command.arguments objectAtIndex:0];
-    DiscoveredPeripheral *discoveredPeripheral = [self findDiscoveredPeripheralByUUID: uuid];
+    DiscoveredPeripheral *discoveredPeripheral = [self findInDiscoveredPeripheralsByUUID: uuid];
 
-    NSDictionary *dictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:1] forKey:CBConnectPeripheralOptionNotifyOnDisconnectionKey];
-    [cbCentralManager connectPeripheral:discoveredPeripheral.peripheral options:dictionary];
+    if (discoveredPeripheral == nil) {
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Peripheral not available!"];
+    } else {
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
+      [pluginResult setKeepCallbackAsBool:TRUE];
+      _connectCallbackId = [command.callbackId copy];
+
+      NSDictionary *dictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:1] forKey:CBConnectPeripheralOptionNotifyOnDisconnectionKey];
+      [cbCentralManager connectPeripheral:discoveredPeripheral.peripheral options:dictionary];
+    }
+  } else {
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Already connected!"];
   }
 
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
@@ -74,83 +110,30 @@ typedef enum {
 
 - (void) disconnect: (CDVInvokedUrlCommand *) command {
   CDVPluginResult *pluginResult = nil;
+  NSLog(@"💋 🎷  API CALL - disconnect");
 
-  NSLog(@"API CALL - disconnect");
-
-  if (state == CONNECTED || state == CONNECTING) {
-
-    if (state == CONNECTED) {
-      [self setState: DISCONNECTING];
+  if (connectedPeripheral == nil) {
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Not Connected or Connecting!"];
+  } else {
+    if(connectedPeripheral.peripheral.state == CBPeripheralStateDisconnected) {
+      connectedPeripheral = nil;
+      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Warning: Peripheral was already disconnected!"];
+    } else {
       pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
       [pluginResult setKeepCallbackAsBool:TRUE];
       _disconnectCallbackId = [command.callbackId copy];
-      connectedPeripheral.state = DP_STATE_DISCONNECTING;
-    } else {
-      [self setState: IDLE];
-      connectedPeripheral.state = DP_STATE_IDLE;
-      pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+      [self disconnectCleanly];
     }
-
-    [cbCentralManager cancelPeripheralConnection:connectedPeripheral.peripheral];
-  } else {
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Not Connected or Connecting!"];
   }
 
-  [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-}
-
-- (void) list: (CDVInvokedUrlCommand*) command {
-    CDVPluginResult* pluginResult = nil;
-
-  NSLog(@"API CALL - list");
-
-  if(cbCentralManager.state != CBCentralManagerStatePoweredOn) {
-    return;
-  }
-
-  if (state != IDLE) {
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Already scanning!"];
-  } else {
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
-    [pluginResult setKeepCallbackAsBool:TRUE];
-    _listCallbackId = [command.callbackId copy];
-
-    [self startScan];
-
-    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, 10.0 * NSEC_PER_SEC);
-    dispatch_after(popTime, dispatch_get_main_queue(), ^{
-      NSLog(@"discoveredPeripherals: %@", discoveredPeripherals);
-      DiscoveredPeripheral* discoveredPeripheral;
-
-      [self stopScan];
-
-      NSMutableArray *mappedDiscoveredPeripherals = [[NSMutableArray alloc] init];
-
-      for (int i = 0; i < discoveredPeripherals.count; i++) {
-        discoveredPeripheral = [discoveredPeripherals objectAtIndex:i];
-        NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
-
-        [dict setValue: discoveredPeripheral.peripheral.name forKey:@"name"];
-        [dict setValue: [discoveredPeripheral uuid] forKey:@"uuid"];
-
-        [mappedDiscoveredPeripherals addObject:dict];
-      }
-
-      CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:mappedDiscoveredPeripherals];
-      [pluginResult setKeepCallbackAsBool:TRUE];
-      [self.commandDelegate sendPluginResult:pluginResult callbackId:_listCallbackId];
-    });
-
-  }
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void) write: (CDVInvokedUrlCommand *) command {
   CDVPluginResult *pluginResult = nil;
+  NSLog(@"💋 🎷  API CALL - write");
 
-  NSLog(@"API CALL - write");
-
-  if (state == CONNECTED) {
+  if (connectedPeripheral != nil) {
     NSString* data = [command.arguments objectAtIndex:0];
     [serialPortController write: data];
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
@@ -163,10 +146,9 @@ typedef enum {
 
 - (void) subscribe: (CDVInvokedUrlCommand *) command {
   CDVPluginResult *pluginResult = nil;
+  NSLog(@"💋 🎷  API CALL - subscribe");
 
-  NSLog(@"API CALL - subscribe");
-
-  if (state != CONNECTED) {
+  if (connectedPeripheral == nil) {
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Must connect before subscribe!"];
   } else {
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_NO_RESULT];
@@ -179,16 +161,45 @@ typedef enum {
 
 - (void) unsubscribe: (CDVInvokedUrlCommand *) command {
   CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+  NSLog(@"💋 🎷  API CALL - unsubscribe");
+
   _subscribeCallbackId = nil;
   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
+
 //
 // Private Methods
 //
+
+- (void) onDidDiscoverPeripheral {
+  if(_scanCallbackId == nil) { return; }
+
+  DiscoveredPeripheral* discoveredPeripheral;
+  NSMutableArray *mappedDiscoveredPeripherals = [[NSMutableArray alloc] init];
+  NSDate *cutoffDate = [NSDate dateWithTimeIntervalSinceNow:-5];
+
+  for (int i = 0; i < discoveredPeripherals.count; i++) {
+    discoveredPeripheral = [discoveredPeripherals objectAtIndex:i];
+
+    if ([discoveredPeripheral.createdAt timeIntervalSinceDate: cutoffDate] > 0) {
+      NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+
+      [dict setValue: discoveredPeripheral.peripheral.name forKey:@"name"];
+      [dict setValue: [discoveredPeripheral uuid] forKey:@"uuid"];
+      [dict setValue: [discoveredPeripheral rssi] forKey:@"rssi"];
+
+      [mappedDiscoveredPeripherals addObject:dict];
+    }
+  }
+
+  CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:mappedDiscoveredPeripherals];
+  [pluginResult setKeepCallbackAsBool:TRUE];
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:_scanCallbackId];
+}
+
 - (void) onData: (NSData*) data {
   if(_subscribeCallbackId != nil) {
-
     double mV;
     const char *firstChar = (const char *)[dataBuffer bytes];
     const char *firstNewChar = (const char *)[data bytes];
@@ -201,9 +212,6 @@ typedef enum {
 
     [dataBuffer appendData: data];
     length = [dataBuffer length];
-
-    NSLog(@"^^^^^ firstChar: %c, length %lu", firstChar[0], (unsigned long)length);
-    NSLog(@"^^^^^ firstNewChar: %c", firstNewChar[0]);
 
     if(strstr(firstChar,"A") && length == 6) {
       mV = [self parseMV: dataBuffer];
@@ -218,6 +226,16 @@ typedef enum {
 
     [pluginResult setKeepCallbackAsBool:TRUE];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:_subscribeCallbackId];
+  }
+}
+
+- (void) disconnectCleanly {
+  if (connectedPeripheral != nil) {
+    [serialPortController write: @"X"];
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, 0.2 * NSEC_PER_SEC);
+    dispatch_after(popTime, dispatch_get_main_queue(), ^{
+      [cbCentralManager cancelPeripheralConnection:connectedPeripheral.peripheral];
+    });
   }
 }
 
@@ -253,46 +271,7 @@ typedef enum {
   return -mV;
 }
 
-- (void) startScan {
-  if(state == IDLE) {
-    NSDictionary *dictionary = [NSDictionary dictionaryWithObject:[NSNumber numberWithInt:1] forKey:CBCentralManagerScanOptionAllowDuplicatesKey];
-    [cbCentralManager scanForPeripheralsWithServices:nil options:dictionary];
-    [self setState: SCANNING];
-  }
-}
-
-- (void) stopScan {
-  if(state == SCANNING) {
-    [cbCentralManager stopScan];
-    [self setState: IDLE];
-  }
-}
-
-- (void) setState: (PLUGIN_State) newState {
-  NSString *old = [self stateToString: state];
-  NSString *new = [self stateToString: newState];
-  //NSLog(@"**** state change **** %@ -> %@", old, new);
-  state = newState;
-}
-
-- (NSString*) stateToString: (PLUGIN_State) testState {
-  switch (testState) {
-    case DEALLOCATED:
-      return @"DEALLOCATED";
-    case IDLE:
-      return @"DEALLOCATED";
-    case CONNECTING:
-      return @"CONNECTING";
-    case DISCONNECTING:
-      return @"DISCONNECTING";
-    case CONNECTED:
-      return @"CONNECTED";
-    case SCANNING:
-      return @"SCANNING";
-  }
-}
-
-- (DiscoveredPeripheral*) findDiscoveredPeripheralByUUID: (NSString*) uuid {
+- (DiscoveredPeripheral*) findInDiscoveredPeripheralsByUUID: (NSString*) uuid {
   DiscoveredPeripheral *discoveredPeripheral = nil;
   NSString *discoveredUUID = nil;
 
@@ -307,12 +286,13 @@ typedef enum {
   return nil;
 }
 
+
 //
 // CBCentralManagerDelegate methods
 //
-- (void) centralManager: (CBCentralManager *) central didDiscoverPeripheral: (CBPeripheral *) peripheral advertisementData: (NSDictionary *) advertisementData RSSI: (NSNumber *) RSSI {
 
-  if((state != SCANNING) || (peripheral == nil)) { return; }
+- (void) centralManager: (CBCentralManager *) central didDiscoverPeripheral: (CBPeripheral *) peripheral advertisementData: (NSDictionary *) advertisementData RSSI: (NSNumber *) RSSI {
+  NSLog(@"💋 !!!! didDiscoverPeripheral, name: %@, RSSI: %@", peripheral.name, RSSI);
 
   DiscoveredPeripheral* discoveredPeripheral = [[DiscoveredPeripheral alloc] initWithPeripheral:peripheral andAdvertisment:advertisementData andRssi:RSSI];
 
@@ -320,72 +300,64 @@ typedef enum {
     NSInteger index = [discoveredPeripherals indexOfObject:discoveredPeripheral];
     [discoveredPeripherals replaceObjectAtIndex:index withObject:discoveredPeripheral];
   } else {
-    [cbCentralManager connectPeripheral:peripheral options:nil];
     [discoveredPeripherals addObject:discoveredPeripheral];
   }
+
+  [self onDidDiscoverPeripheral];
 }
 
 - (void)centralManager:(CBCentralManager *)central didConnectPeripheral:(CBPeripheral *)peripheral {
+  NSLog(@"💋  !!!! didConnectPeripheral");
+
   NSString *uuid = [DiscoveredPeripheral uuidToString:peripheral.UUID];
+  connectedPeripheral = [self findInDiscoveredPeripheralsByUUID:uuid];
+  serialPortController = [[SerialPortController alloc] initWithPeripheral: connectedPeripheral andDataReceiverDelegate: self];
 
-  if(state == CONNECTING) {
-    [self setState: CONNECTED];
-    connectedPeripheral = [self findDiscoveredPeripheralByUUID:uuid];
-    connectedPeripheral.state = DP_STATE_CONNECTED;
+  NSMutableDictionary *deviceInfo = [[NSMutableDictionary alloc] init];
+  [deviceInfo setValue: connectedPeripheral.peripheral.name forKey:@"name"];
+  [deviceInfo setValue: [connectedPeripheral uuid] forKey:@"uuid"];
 
-    serialPortController = [[SerialPortController alloc] initWithPeripheral: connectedPeripheral andDataReceiverDelegate: self];
-
-    NSMutableDictionary *deviceInfo = [[NSMutableDictionary alloc] init];
-    [deviceInfo setValue: connectedPeripheral.peripheral.name forKey:@"name"];
-    [deviceInfo setValue: [connectedPeripheral uuid] forKey:@"uuid"];
-
-    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary: deviceInfo];
-    [pluginResult setKeepCallbackAsBool:TRUE];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
-  } else if(state == SCANNING) {
-    NSLog(@"!!!! didConnectPeripheral called when SCANNING (it's all good)");
-  } else {
-    NSLog(@"!!!! didConnectPeripheral called when not CONNECTING!!!");
-  }
-}
-
-- (void)centralManager:(CBCentralManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error {
-  NSString *uuid = [DiscoveredPeripheral uuidToString:peripheral.UUID];
-  DiscoveredPeripheral *disconnectedPeripheral = [self findDiscoveredPeripheralByUUID:uuid];
-  disconnectedPeripheral.state = DP_STATE_IDLE;
-
-  if(state == DISCONNECTING) {
-    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    [pluginResult setKeepCallbackAsBool:TRUE];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:_disconnectCallbackId];
-  } else if(state == CONNECTED) {
-    NSLog(@"!!!! didDisconnectPeripheral called when CONNECTED!!!");
-  } else {
-    NSLog(@"!!!! didDisconnectPeripheral called when not CONNECTED or DISCONNECTING!!!");
-  }
-
-  [self setState: IDLE];
-  connectedPeripheral = nil;
+  CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary: deviceInfo];
+  [pluginResult setKeepCallbackAsBool:TRUE];
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
 }
 
 - (void)centralManager:(CBCentralManager *)central didFailToConnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error {
-  [self setState: IDLE];
-  if(state == CONNECTING) {
-    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Failed to Connect!"];
-    [pluginResult setKeepCallbackAsBool:TRUE];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
-  } else {
-    NSLog(@"!!!! didFailToConnectPeripheral called when not CONNECTING!!!");
-  }
+  NSLog(@"💋  !!!! didFailToConnectPeripheral");
+
+  CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: @"Failed to Connect!"];
+  [pluginResult setKeepCallbackAsBool:TRUE];
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:_connectCallbackId];
+}
+
+- (void)centralManager:(CBCentralManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error {
+  NSLog(@"💋  !!!! didDisconnectPeripheral");
+  connectedPeripheral = nil;
+  CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+  [pluginResult setKeepCallbackAsBool:TRUE];
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:_disconnectCallbackId];
 }
 
 - (void) centralManagerDidUpdateState: (CBCentralManager *) central {
-  NSLog(@"!!!! centralManagerDidUpdateState called: %ld", central.state);
-  if(central.state == CBCentralManagerStatePoweredOn) {
-    [self setState: IDLE];
-  } else {
-    [self setState: DEALLOCATED];
+  NSLog(@"💋  !!!! centralManagerDidUpdateState called: %ld", central.state);
+  CDVPluginResult *pluginResult;
+  NSString* status;
+
+  if (central.state == CBCentralManagerStatePoweredOn) {
+    status = @"ready";
+  } else if (central.state == CBCentralManagerStatePoweredOff) {
+    status = @"off";
+  } else if (central.state == CBCentralManagerStateResetting) {
+    status = @"resetting";
+  } else if (central.state == CBCentralManagerStateUnsupported) {
+    status = @"unsupported";
+  } else if (central.state == CBCentralManagerStateUnauthorized) {
+    status = @"unauthorized";
   }
+
+  pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString: status];
+  [pluginResult setKeepCallbackAsBool:TRUE];
+  [self.commandDelegate sendPluginResult:pluginResult callbackId:_initializeCallbackId];
 }
 
 @end
