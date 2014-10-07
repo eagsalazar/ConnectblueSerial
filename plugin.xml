@@ -25,6 +25,10 @@
       </feature>
     </config-file>
 
+    <config-file target="*-Info.plist" parent="UIApplicationExitsOnSuspend">
+      <true/>
+    </config-file>
+
     <header-file src="src/ios/BLEDefinitions.h" target-dir="ConnectblueSerial" />
     <source-file src="src/ios/BLEDefinitions.m" target-dir="ConnectblueSerial" />
     <header-file src="src/ios/DiscoveredPeripheral.h" target-dir="ConnectblueSerial" />
