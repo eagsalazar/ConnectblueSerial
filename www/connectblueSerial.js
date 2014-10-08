@@ -1,35 +1,30 @@
 module.exports = {
 
-  initialize: function (update, failure) {
-    cordova.exec(update, failure, "ConnectblueSerial", "initialize", []);
+  initialize: function (update) {
+    cordova.exec(update, this._onError, "ConnectblueSerial", "initialize", []);
   },
 
-  scan: function (update, failure) {
-    cordova.exec(update, failure, "ConnectblueSerial", "scan", []);
+  scan: function () {
+    cordova.exec(this._onWtf, this._onError, "ConnectblueSerial", "scan", []);
   },
 
-  stopScan: function (success, failure) {
-    cordova.exec(success, failure, "ConnectblueSerial", "stopScan", []);
+  stopScan: function () {
+    cordova.exec(this._onWtf, this._onError, "ConnectblueSerial", "stopScan", []);
   },
 
-  connect: function (uuid, success, failure) {
-    cordova.exec(success, failure, "ConnectblueSerial", "connect", [uuid]);
+  connect: function (uuid) {
+    cordova.exec(this._onWtf, this._onError, "ConnectblueSerial", "connect", [uuid]);
   },
 
-  disconnect: function (success, failure) {
-    cordova.exec(success, failure, "ConnectblueSerial", "disconnect", []);
+  disconnect: function () {
+    cordova.exec(this._onWtf, this._onError, "ConnectblueSerial", "disconnect", []);
   },
 
-  write: function (data, success, failure) {
-    cordova.exec(success, failure, "ConnectblueSerial", "write", [data]);
+  write: function (data) {
+    cordova.exec(this._onWtf, this._onError, "ConnectblueSerial", "write", [data]);
   },
 
-  subscribe: function (update, failure) {
-    cordova.exec(update, failure, "ConnectblueSerial", "subscribe", []);
-  },
-
-  unsubscribe: function (success, failure) {
-    cordova.exec(success, failure, "ConnectblueSerial", "unsubscribe", []);
-  }
+  _onError: function (message) { throw new Error(message); },
+  _onWtf: function () { throw new Error("WTF?"); }
 
 };

@@ -14,7 +14,5 @@
 - (void) connect: (CDVInvokedUrlCommand *) command;
 - (void) disconnect: (CDVInvokedUrlCommand *) command;
 - (void) write: (CDVInvokedUrlCommand *) command;
-- (void) subscribe: (CDVInvokedUrlCommand *) command;
-- (void) unsubscribe: (CDVInvokedUrlCommand *) command;
 @end
 

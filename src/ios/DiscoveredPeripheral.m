@@ -10,7 +10,6 @@
 
 - (DiscoveredPeripheral*) initWithPeripheral: (CBPeripheral*) newPeripheral andAdvertisment: (NSDictionary*) newAdvertisment andRssi: (NSNumber*) newRssi {
     self.peripheral = newPeripheral;
-    self.peripheral.delegate = self;
     self.advertisment = newAdvertisment;
     self.rssi = newRssi;
     self.createdAt = [NSDate date];
@@ -35,11 +34,5 @@
 - (NSUInteger) hash {
   return [self.peripheral hash];
 }
-
-- (void) peripheralDidUpdateRSSI:(CBPeripheral *)peripheral error:(NSError *)error {
-  self.rssi = self.peripheral.RSSI;
-  NSLog(@"💋 * peripheralDidUpdateRSSI: %d", self.rssi);
-}
-
 
 @end

@@ -5,7 +5,7 @@
 #import <Foundation/Foundation.h>
 #import <CoreBluetooth/CoreBluetooth.h>
 
-@interface DiscoveredPeripheral : NSObject <CBPeripheralDelegate>
+@interface DiscoveredPeripheral : NSObject
 
 @property (nonatomic, strong) CBPeripheral* peripheral;
 @property (nonatomic, strong) NSDictionary* advertisment;
