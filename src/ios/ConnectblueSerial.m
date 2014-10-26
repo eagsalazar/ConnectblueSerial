@@ -12,6 +12,7 @@
 - (void) disconnectCleanly;
 - (DiscoveredPeripheral*) findInDiscoveredPeripheralsByUUID: (NSString*) uuid;
 - (double) parseMV: (NSData*) data;
+- (NSString *) c2b: (char) charValue;
 @end
 
 @implementation ConnectblueSerial {
@@ -126,6 +127,18 @@
   [self publishUpdate: update];
 }
 
+//- (void) onData: (NSData*) data {
+//  NSData *subBuffer;
+//
+//  NSLog(@"onData: %@", data);
+//
+//  for (int i = 0; i < [data length]; i++) {
+//    subBuffer = [data subdataWithRange:NSMakeRange(i, 1)];
+//    NSLog(@"onData: %d : %@", i, subBuffer);
+//    [self onByte: subBuffer];
+//  }
+//}
+
 - (void) onData: (NSData*) data {
   double mV;
   const char *firstChar = (const char *)[dataBuffer bytes];
@@ -144,6 +157,7 @@
 
   if(strstr(firstChar,"A") && length == 6) {
     mV = [self parseMV: dataBuffer];
+
     [update addObject: @(mV)];
     [dataBuffer setLength: 0];
   } else if (strstr(firstChar,"T") && length == 5) {
@@ -172,36 +186,49 @@
   }
 }
 
+- (NSString *) c2b: (char) charValue
+{
+    int byteBlock = 8,    // 8 bits per byte
+        totalBits = sizeof(char) * byteBlock, // Total bits
+        binaryDigit = 1;  // Current masked bit
+
+    // Binary string
+    NSMutableString *binaryStr = [[NSMutableString alloc] init];
+
+    do {
+      // Check next bit, shift contents left, append 0 or 1
+      [binaryStr insertString:((charValue & binaryDigit) ? @"1" : @"0" ) atIndex:0];
+
+      // More bits? On byte boundary?
+      if (--totalBits && !(totalBits % byteBlock))
+        [binaryStr insertString:@" " atIndex:0];
+
+      // Move to next bit
+      binaryDigit <<= 1;
+
+    } while (totalBits);
+
+    // Return binary string
+    return binaryStr;
+}
+
 - (double) parseMV: (NSData*) data {
-  const unsigned char *bytes = [data bytes];
-  double mV;
+  double mV = 0;
+  int32_t value;
+  [data getBytes:&value range:NSMakeRange(2, 4)];
+  value = CFSwapInt32BigToHost(value); // or CFSwapInt32LittleToHost
 
-  int32_t copy, shifted, accumulated;
+  value <<= 3; // discard the 3 most significant bits as
+               // they are not part of the value this also
+               // brings the sign bit to the most significant
+               // bit position.
 
-  copy = bytes[2];
-  shifted = copy << 24;
-  accumulated = shifted;
+  value >>= 8; // discard the 5 least significant bits as
+               // they are below the noise levels.
 
-  copy = bytes[3];
-  shifted = copy << 16;
-  accumulated += shifted;
+  mV = ((double)value)*2048.0/16777216.0; // Convert to mV
 
-  copy = bytes[4];
-  shifted = copy << 8;
-  accumulated += shifted;
-
-  copy = bytes[5];
-  shifted = copy;
-  accumulated += shifted;
-
-  accumulated <<= 3;
-  accumulated >>= 8;
-
-  mV = (double)accumulated;
-  mV *= 2048;
-  mV /= 16777216;
-
-  return -mV;
+  return mV;
 }
 
 - (DiscoveredPeripheral*) findInDiscoveredPeripheralsByUUID: (NSString*) uuid {
@@ -274,7 +301,7 @@
 }
 
 - (void) centralManagerDidUpdateState: (CBCentralManager *) central {
-  NSLog(@"💋  !!!! centralManagerDidUpdateState called: %d", central.state);
+  NSLog(@"💋  !!!! centralManagerDidUpdateState called: %ld", central.state);
   NSString* status;
 
   if (central.state == CBCentralManagerStatePoweredOn) {
