@@ -228,7 +228,7 @@
 
   mV = ((double)value)*2048.0/16777216.0; // Convert to mV
 
-  return mV;
+  return -mV;
 }
 
 - (DiscoveredPeripheral*) findInDiscoveredPeripheralsByUUID: (NSString*) uuid {
